@@ -1,0 +1,10 @@
+{
+    "SGBD": {
+        "Tables": {
+
+        },
+        "Indexes": {
+            "index1": "(table1, name1)"
+        }
+    }
+}

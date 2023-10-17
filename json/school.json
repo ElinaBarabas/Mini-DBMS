@@ -1,0 +1,18 @@
+{
+    "SCHOOL": {
+        "Tables": {
+            "students": [
+                "id",
+                "name"
+            ],
+            "teachers": [
+                "name",
+                "email"
+            ]
+        },
+        "Indexes": {
+            "email_index": "(teachers, email)",
+            "id_index": "(students, id)"
+        }
+    }
+}

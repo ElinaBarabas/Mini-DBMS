@@ -1,0 +1,47 @@
+{
+    "TEST1": {
+        "Tables": {
+            "table1": {
+                "Attributes": {
+                    "1": "int",
+                    "2": "int",
+                    "cc": "varchar"
+                },
+                "Keys": {
+                    "PK": "1",
+                    "FK": {}
+                }
+            },
+            "table2": {
+                "Attributes": {
+                    "1": "int",
+                    "val2": "int",
+                    "cc": "varchar"
+                },
+                "Keys": {
+                    "PK": {},
+                    "FK": {}
+                }
+            },
+            "table3": {
+            }
+                "Attributes": {
+                    "1": "int",
+                    "val2": "int",
+                    "cc": "varchar"
+                },
+                "Keys": {
+                    "PK": {},
+                    "FK": {}
+                }
+            },
+            "table4": {
+                "Attributes": {
+                    "1": "int",
+                    "val2": "int",
+                    "cc": "varchar"
+                },
+                "Keys": {
+                    "PK": {},
+                    "FK": {
+                        "val2": 
