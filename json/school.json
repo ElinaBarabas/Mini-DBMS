@@ -8,7 +8,75 @@
             "teachers": [
                 "name",
                 "email"
-            ]
+            ],
+            "nustou(int": {
+                "Attributes": {
+                    "unu": "int",
+                    "doi": "int",
+                    "nusss": "int"
+                },
+                "Keys": {
+                    "PK": "doi",
+                    "FK": {}
+                }
+            },
+            "test(int": {
+                "Attributes": {
+                    "unu": "int",
+                    "doi": "int"
+                },
+                "Keys": {
+                    "PK": "doi",
+                    "FK": {}
+                }
+            },
+            "test(": {
+                "Attributes": {
+                    "unuuu": "int",
+                    "doi": "int",
+                    "valoare": "int"
+                },
+                "Keys": {
+                    "PK": "doi",
+                    "FK": {
+                        "valoare": " du-te naibi"
+                    }
+                }
+            },
+            "nustou": {
+                "Attributes": {
+                    "unu": "int",
+                    "doi": "int"
+                },
+                "Keys": {
+                    "PK": "doi",
+                    "FK": {}
+                }
+            },
+            "mergeee": {
+                "Attributes": {
+                    "unu": "int",
+                    "doooooi": "int",
+                    "treeeei": "int"
+                },
+                "Keys": {
+                    "PK": "doooooi",
+                    "FK": {}
+                }
+            },
+            "mergeee2": {
+                "Attributes": {
+                    "unu": "int",
+                    "doooooi": "int",
+                    "treeeei": "int"
+                },
+                "Keys": {
+                    "PK": "doooooi",
+                    "FK": {
+                        "treeeei": "students,is"
+                    }
+                }
+            }
         },
         "Indexes": {
             "email_index": "(teachers, email)",

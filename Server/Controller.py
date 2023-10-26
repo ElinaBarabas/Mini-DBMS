@@ -164,8 +164,13 @@ class Controller:
                     print(f"There is no such column {table_column} in table: {table_name}")
 
                 # tuple_value = (table_name,table_column)
-                # data[database_name.upper()]["Tables"][self.instance_name]["Keys"]["FK"] = {         # --- DE REVAZUT
-                #     fk_value: {table_name: {},table_column: {}}}
+                fk_tostring = "(" + table_name + ", " + table_column + ")"
+                print(fk_tostring)
+                if isinstance(fk_tostring, str):
+                    print("my_variable is a string")
+                else:
+                    print("my_variable is not a string")
+                data[database_name.upper()]["Tables"][self.instance_name]["Keys"]["FK"][fk_value] = fk_tostring
 
             with open(file_path, 'w') as json_file:
                 json.dump(data, json_file, indent=4)
