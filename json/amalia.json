@@ -1,0 +1,22 @@
+{
+    "AMALIA": {
+        "Tables": {
+            "ioana": {
+                "Attributes": {
+                    "y": "int",
+                    "b": "int",
+                    "v2": "int"
+                },
+                "Keys": {
+                    "PK": "y",
+                    "FK": {
+                        "b": "(maria, v1)"
+                    }
+                }
+            }
+        },
+        "Indexes": {
+            "i": "(ioana, y)"
+        }
+    }
+}

@@ -6,7 +6,7 @@ import json
 def client_program():
     try:
         host = socket.gethostname()
-        port = 5235
+        port = 5236
 
         client_socket = socket.socket()
         client_socket.connect((host, port))

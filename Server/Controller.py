@@ -259,7 +259,7 @@ class Controller:
             data = json.load(json_file)
 
         if table_name in data[database_name]["Tables"]:
-            if column_name in data[database_name]["Tables"][table_name]:
+            if column_name in data[database_name]["Tables"][table_name]["Attributes"]:
                 tuple_str = "(" + table_name + ", " + column_name + ")"
                 data[database_name.upper()]["Indexes"][self.instance_name] = tuple_str
 
