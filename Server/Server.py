@@ -17,7 +17,7 @@ def server_program():
         data = ""
 
         while data != "exit":
-            try:  # Add a try block inside the while loop
+            try:
                 data = conn.recv(1024).decode()
 
                 client_request = str(data)

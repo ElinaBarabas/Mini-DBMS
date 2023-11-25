@@ -72,11 +72,7 @@ class Controller:
         left_bracket_index = client_data.index(left_bracket)
         right_bracket_index = client_data.index(right_bracket)
 
-        # print(left_bracket_index)
-        # print(right_bracket_index)
-
         table_data = client_data[left_bracket_index + 1: right_bracket_index]
-        # print(table_data)
 
         return list(map(lambda x: x.strip(), table_data.split(',')))
 
@@ -163,7 +159,6 @@ class Controller:
                 if not (table_column in data[database_name.upper()]["Tables"][table_name]):
                     print(f"There is no such column {table_column} in table: {table_name}")
 
-                # tuple_value = (table_name,table_column)
                 fk_tostring = "(" + table_name + ", " + table_column + ")"
                 print(fk_tostring)
                 if isinstance(fk_tostring, str):
@@ -209,8 +204,8 @@ class Controller:
 
         with open(file_path, 'r') as json_file:
             data = json.load(json_file)
-        print(data)
-        # Check if the key "Tables" exists.
+
+
         if "Tables" in data[database_name]:
             if self.instance_name in data[database_name]["Tables"]:
                 del data[database_name]["Tables"][self.instance_name]
@@ -223,13 +218,6 @@ class Controller:
                 raise Exception(f"Table '{self.instance_name}' not found in {file_name}")
         else:
             raise Exception(f"No 'Tables' key found in {file_name}")
-
-        # except FileNotFoundError:
-        #     print(f"File '{file_path}' not found.")
-        # except json.JSONDecodeError:
-        #     print(f"Invalid JSON in file '{file_path}'")
-        # except Exception as e:
-        #     print(f"An error occurred: {str(e)}")
 
     def create_index(self, client_request):
 
@@ -273,7 +261,3 @@ class Controller:
         else:
             raise Exception(f"There is no such table {table_name}")
 
-        # except json.JSONDecodeError:
-        #     print(f"Invalid JSON in file '{file_path}'")
-        # except Exception as e:
-        #     print(f"An error occurred: {str(e)}")
