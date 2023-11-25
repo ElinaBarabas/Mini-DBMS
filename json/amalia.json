@@ -13,6 +13,31 @@
                         "b": "(maria, v1)"
                     }
                 }
+            },
+            "tets": {
+                "Attributes": {
+                    "unu": "int",
+                    "doi": "int",
+                    "3": "varchar"
+                },
+                "Keys": {
+                    "PK": "unu",
+                    "FK": {}
+                }
+            },
+            "ttt": {
+                "Attributes": {
+                    "unu": "int",
+                    "doi": "int",
+                    "3": "varchar",
+                    "numefk": "int"
+                },
+                "Keys": {
+                    "PK": "unu",
+                    "FK": {
+                        "numefk": "(tets, unu)"
+                    }
+                }
             }
         },
         "Indexes": {

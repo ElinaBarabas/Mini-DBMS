@@ -42,7 +42,7 @@ def server_program():
                     controller.drop_database()
                     mongo.update_mongoDB()
 
-                elif command_type == "create" and instance_type == "table":   # create table table_name (...) on database_name
+                elif command_type == "create" and instance_type == "table":   # # create table table_name (int 1, FK int val2 ref table_name-table_column, varchar cc) on db_name
                     controller.create_table(client_request)
                     mongo.update_mongoDB()
 

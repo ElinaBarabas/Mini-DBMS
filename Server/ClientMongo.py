@@ -21,19 +21,62 @@ class ClientMongo:
             db = self.client[db_name]
             db_name = db_name.upper()
 
+
             with open(os.path.join(json_directory, json_file), 'r') as file:
                 data = json.load(file)
 
-            values = data.get(db_name, {})
-            values = values.get('Tables', {})
+            table_values = data.get(db_name, {})
+            table_values = table_values.get('Tables', {})
 
-            for value in values:
-                collection_name = value
+#check if there are new tables added and update the DB (and create index files for PK)
+
+            for t_value in table_values:
+                table_name = t_value
+                if table_name in db.list_collection_names():  # Check if the collection exists
+                    print(f"Table '{table_name}' already exists.")
+                else:  # If the collection does not exist, create it
+                    db.create_collection(table_name)
+                    print(f"Table '{table_name}' created successfully.")
+
+                unique_index_pk = table_values[table_name]["Keys"]["PK"]
+                collection_name = "INDEX_"  + table_name  + "_" + unique_index_pk
                 if collection_name in db.list_collection_names():  # Check if the collection exists
-                    print(f"Table '{collection_name}' already exists.")
+                    print(f"Index '{collection_name}' already exists.")
                 else:  # If the collection does not exist, create it
                     db.create_collection(collection_name)
-                    print(f"Table '{collection_name}' created successfully.")
+                    print(f"Index '{collection_name}' created successfully.")
+
+# DO THE SAME FOR fk NON UNIQUE INDEXES
+               # non_unique_index = table_values[table_name]["Keys"]["FK"]
+                #non_unique_index_fk = next(iter(non_unique_index))
+                #print("FK nnn", non_unique_index_fk)
+                if not (table_values[table_name]["Keys"]["FK"]):
+                    print("FK empty")
+                else:
+                    non_unique_index = table_values[table_name]["Keys"]["FK"]
+                    non_unique_index_fk = next(iter(non_unique_index))
+                    print("FK nnn", non_unique_index_fk)
+                    collection_name = "INDEX_FK_" + table_name + "_" + non_unique_index_fk[0]
+                    if collection_name in db.list_collection_names():  # Check if the collection exists
+                        print(f"Non unique Index '{collection_name}' already exists.")
+                    else:  # If the collection does not exist, create it
+                        db.create_collection(collection_name)
+                        print(f"Non unique Index '{collection_name}' created successfully.")
+#check if there are deleted tables (not in folder but in mongoDB exist) and delete them
+            mongo_collections = db.list_collection_names()
+            collections_to_delete = [coll for coll in mongo_collections if coll not in table_values and "INDEX_" not in coll]
+            print("collections_to_delete:", collections_to_delete)
+            for collection_name in collections_to_delete:
+                db[collection_name].drop()
+# check if tables were deleted and delete the afferent indexes for them
+                index_name = "INDEX_" + collection_name
+                print("table valuess ",table_values)
+                indexes_to_delete = [coll for coll in mongo_collections if coll not in table_values and index_name in coll]
+                print("indexes_to_delete:", indexes_to_delete)
+                for index_name in indexes_to_delete:
+                    db[index_name].drop()
+
+
 
     def insert_mongoDB(self, database_name, table_name):
 

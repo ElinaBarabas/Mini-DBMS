@@ -1,14 +1,6 @@
 {
     "SCHOOL": {
         "Tables": {
-            "students": [
-                "id",
-                "name"
-            ],
-            "teachers": [
-                "name",
-                "email"
-            ],
             "test(int": {
                 "Attributes": {
                     "unu": "int",
