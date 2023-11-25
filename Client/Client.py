@@ -1,12 +1,13 @@
 from InputManipulator import InputManipulator
 import socket
 import json
-
+import os
+from pymongo import MongoClient
 
 def client_program():
     try:
         host = socket.gethostname()
-        port = 5236
+        port = 5235
 
         client_socket = socket.socket()
         client_socket.connect((host, port))

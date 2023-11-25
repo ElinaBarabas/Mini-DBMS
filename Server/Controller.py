@@ -261,3 +261,92 @@ class Controller:
         else:
             raise Exception(f"There is no such table {table_name}")
 
+    def get_table_attributes(self,db_name, table_name):
+        file_directory = os.getcwd()
+        file_directory = os.path.abspath(os.path.join(file_directory, os.pardir))
+        file_directory += f"\\json\\"
+
+        file_name = f"{db_name.lower()}.json"
+
+        current_directory = file_directory
+        existing_files = os.listdir(current_directory)
+
+        database_exists = 0
+
+        for file in existing_files:
+            if file == file_name:
+                database_exists = 1
+
+        if database_exists == 0:
+            raise Exception(f"There is no database with this name {db_name}")
+
+        file_path = os.path.join(file_directory, file_name)
+
+        db_name = db_name.upper()
+
+        with open(file_path, 'r') as json_file:
+            json_data = json.load(json_file)
+
+        if db_name in json_data:
+            tables = json_data[db_name].get('Tables', {})
+
+            if table_name in tables:
+                table_data = tables[table_name]
+                keys_data = table_data.get('Keys', {})
+
+                pk_key = keys_data.get('PK', None)
+                attributes_data = table_data.get('Attributes', {})
+
+                if pk_key in attributes_data:
+                    pk_value = attributes_data.pop(pk_key)
+
+                result = {"PK": {pk_key: pk_value}, "Attributes": attributes_data}
+                return result
+        else:
+            return None
+
+    def mongoDB_format (self,db_name,table_name,client_data):
+        values = self.process_brackets_fields(client_data)
+        if len(values) <= 1:
+            return "You need to specify the values of attributes separated by a coma"
+        else:
+            attributes_json = self.get_table_attributes(db_name, table_name)
+            if attributes_json is None:
+                raise Exception("There is no database/table with this name")
+            else:
+                print(attributes_json)
+
+            if attributes_json:
+                pk_data = attributes_json["PK"]
+                attributes_data = attributes_json["Attributes"]
+                pk_type, pk_name = None, None
+
+                for key in pk_data:
+                    pk_name, pk_type = key, pk_data[key]
+
+                print("PK Type:", pk_type)
+                print("PK Name:", pk_name)
+                print(type(values[0]))
+                if pk_type.lower() == "int" and isinstance(int(values[0]),int):  # verify if it must be an integer
+                    id = int(values[0])
+                elif pk_type.lower() == "varchar" and isinstance(values[0], str):  # verify if it must be strinbg
+                        id = values[0]
+                else:
+                        raise Exception("Invalid PK Type")
+                values.remove(str(id))
+                attributes =""
+                print(attributes_data.items())
+                for value,(attribute_name,attribute_type) in zip (values,attributes_data.items()):
+                    print(attribute_type.lower())
+                    #print(value)
+                    if attribute_type.lower() == "int" and isinstance(int(value), int):  # verify if it must be an integer
+                        attributes += str(value) + '#'
+                    elif attribute_type.lower() == "varchar" and isinstance(value,str):
+                        attributes += str(value) + '#'
+                    else:
+                        raise Exception ("Invalid type, please make sure you entered correctly the attributes types")
+            else:
+                print("Table not found or no PK defined.")
+
+            return id,attributes
+

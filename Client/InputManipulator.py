@@ -26,3 +26,4 @@ class InputManipulator:
                 raise Exception("Client must enter the command type (create, drop, insert, delete, select)")
             else:
                 validate_command_type(command_type, inputCommands)
+

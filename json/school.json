@@ -9,17 +9,6 @@
                 "name",
                 "email"
             ],
-            "nustou(int": {
-                "Attributes": {
-                    "unu": "int",
-                    "doi": "int",
-                    "nusss": "int"
-                },
-                "Keys": {
-                    "PK": "doi",
-                    "FK": {}
-                }
-            },
             "test(int": {
                 "Attributes": {
                     "unu": "int",
