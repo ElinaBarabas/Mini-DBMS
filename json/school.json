@@ -20,7 +20,7 @@
                 "Keys": {
                     "PK": "doi",
                     "FK": {
-                        "valoare": " du-te naibi"
+                        "valoare": " valoarrrre"
                     }
                 }
             },
@@ -60,8 +60,11 @@
             }
         },
         "Indexes": {
-            "email_index": "(teachers, email)",
-            "id_index": "(students, id)"
+            "Unique": {
+                "email_index": "(teachers, email)",
+                "id_index": "(students, id)"
+            },
+            "NonUnique": {}
         }
     }
 }

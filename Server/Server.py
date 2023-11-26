@@ -51,8 +51,12 @@ def server_program():
                     controller.delete_table(db_name)
                     mongo.update_mongoDB()
 
-                elif command_type == "create" and instance_type == "index":   # create index index_name (table_name,column_name) on database_name
-                    controller.create_index(client_request)
+                elif command_type == "create" and instance_type == "index":   # create  index unique/nonunique index_name on table_name (column_name,column_name) on database_name
+                    table_name = commands[5].lower()
+                    db_name = commands[len(commands) - 1].lower()
+                    index_type = commands[2].lower()
+                    index_name = commands[3].lower()
+                    controller.create_index(db_name, table_name,index_type,index_name,client_request)
                     mongo.update_mongoDB()
 
                 elif command_type == "insert" and instance_type == "into":   # insert into db_name table_name values (1,2,3)
