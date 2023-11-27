@@ -49,7 +49,9 @@
             },
             "NonUnique": {
                 "n222umeee": "(ioana, y, b)",
-                "MMMMMMM": "(tets, doi)"
+                "MMMMMMM": "(tets, doi)",
+                "NON_UNIQUE_INDEX22": "(ttt, numefk)",
+                "NON_UNIQUE_INDEX22212": "(ttt, 3)"
             }
         }
     }

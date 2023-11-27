@@ -32,9 +32,7 @@ class ClientMongo:
 
             for t_value in table_values:
                 table_name = t_value
-                if table_name in db.list_collection_names():  # Check if the collection exists
-                    print(f"Table '{table_name}' already exists.")
-                else:  # If the collection does not exist, create it
+                if table_name not in db.list_collection_names():  # Check if the collection exists # If the collection does not exist, create it
                     db.create_collection(table_name)
                     print(f"Table '{table_name}' created successfully.")
 #create UNIQUE indexes if nedded
@@ -43,9 +41,7 @@ class ClientMongo:
 
                 table = table.strip("()").split(",")
                 collection_name = "INDEX_" + table[0] + "_" + i_value
-                if collection_name in db.list_collection_names():  # Check if the collection exists
-                    print(f"Index '{collection_name}' already exists.")
-                else:  # If the collection does not exist, create it
+                if collection_name not in db.list_collection_names():  # Check if the collection exists
                     db.create_collection(collection_name)
                     print(f"Index '{collection_name}' created successfully.")
 
@@ -55,22 +51,20 @@ class ClientMongo:
 
                 table = table.strip("()").split(",")
                 collection_name = "INDEX_" + table[0] + "_" + i_value
-                if collection_name in db.list_collection_names():  # Check if the collection exists
-                    print(f"Index '{collection_name}' already exists.")
-                else:  # If the collection does not exist, create it
+                if collection_name not in db.list_collection_names():   # If the collection does not exist, create it
                     db.create_collection(collection_name)
                     print(f"Index '{collection_name}' created successfully.")
 #check if there are deleted tables (not in folder but in mongoDB exist) and delete them
             mongo_collections = db.list_collection_names()
             collections_to_delete = [coll for coll in mongo_collections if coll not in table_values and "INDEX_" not in coll]
-            print("collections_to_delete:", collections_to_delete)
             for collection_name in collections_to_delete:
+                print("collections_to_delete:", collections_to_delete)
                 db[collection_name].drop()
 # check if tables were deleted and delete the afferent indexes for them
                 index_name = "INDEX_" + collection_name
                 indexes_to_delete = [coll for coll in mongo_collections if coll not in table_values and index_name in coll]
-                print("indexes_to_delete:", indexes_to_delete)
                 for index_name in indexes_to_delete:
+                    print("indexes_to_delete:", indexes_to_delete)
                     db[index_name].drop()
 
 
@@ -123,34 +117,50 @@ class ClientMongo:
         if existing_doc is not None:
 
             # Document with the specified _id already exists
-            print(f"Document with _id {id} already exists")
+            raise Exception (f"Document with _id {id} already exists")
         elif not unique:
+            try:
 # Document with the specified _id does not exist and there are no unique indexes so you can insert it without checking the unicity
-
-            data = {
-                "_id": id,
-                "Value": attributes
-                }
-            collection.insert_one(data)
-            print(f"Data inserted with custom _id: {id}")
-# function to add in index non-unique file too. NOT WORKING PROPERLY
-            if non_unique:
-                value2=""
-                attributes = attributes.split("#") #to add 1#2#4
-                for key,value in non_unique.items():
-                    print(key, value)
-                    n_index = value.strip("()").split(",")[1:]
-                    for n in n_index:
-                        position = self.return_attribute_position(database_name, table_name, non_unique, n)
-                        print("POS",position)
-                        value2 = value2 + attributes[position-1] + "#"
-                    collection_index = db["INDEX_"+ table_name + "_" + key]
-
-                    data_index = {
-                        "_id": value2,
-                        "Value": id
+                data = {
+                    "_id": id,
+                    "Value": attributes
                     }
-                    collection_index.insert_one(data_index)
+                collection.insert_one(data)
+                print(f"Data inserted with custom _id: {id}")
+    # function to add in index non-unique file too. NOT WORKING PROPERLY
+                if non_unique:
+                    value2=""
+                    attributes = attributes.split("#") #to add 1#2#4
+                    for key,value in non_unique.items():
+                        print(key, value)
+                        n_index = value.strip("()").split(",")[1:]
+                        for n in n_index:
+                            print("n in n_index: ",n)
+                            n ="".join(n.split())
+                            position = self.return_attribute_position(database_name, table_name, non_unique, n)
+                            print("POS",position)
+                            print("attributes: ",attributes)
+                            value2 = attributes[position-2]
+                        collection_index_name = "INDEX_"+ table_name + "_" + key
+                        collection_index = db[collection_index_name]
+                        print("collection_index: ",collection_index_name)
+                        index_doc = collection_index.find_one({"_id": id})
+                        print("value22:",value2)
+                        if index_doc is None:
+                            data_index = {
+                                "_id": value2,
+                                "Value": concatenated_id
+                            }
+                        else:
+                            print("idc",index_doc['Value'])
+                            concatenated_id = str(index_doc['Value']) + "#" + str(id)
+                            data_index = {
+                                "_id": value2,
+                                "Value": concatenated_id
+                            }
+                        collection_index.insert_one(data_index)
+                        print(f"Data inserted with custom _id for INDEX: {value2}")
+            except Exception as e:(" Exception for non unique indexes")
         else: #it means that there are unique indexes so we need to check it. TO BE COTINUED, NOT COMPLETED
             att_name = "y"
             result = self.return_attribute_position(database_name, table_name, unique, att_name)
@@ -235,12 +245,15 @@ class ClientMongo:
                     else:
                         non_unique_indexes[index_name] = index_definition
         unique_indexes = {k: v for k, v in unique_indexes.items() if v.startswith(table_name)}
+        print(f"UNIQUE INDEXES FOR TABLE {table_name} are ", unique_indexes)
         non_unique_indexes = {k: v for k, v in non_unique_indexes.items() if v.startswith("(" + table_name)}
+        print(f"NON UNIQUE INDEXES FOR TABLE {table_name} are ", non_unique_indexes)
 
         return unique_indexes, non_unique_indexes
 
 
     def return_attribute_position(self,database_name,table_name,indexes_dict,attribute_name):
+        attribute_name = attribute_name.replace(" ", "")
         file_directory = os.getcwd()
         file_directory = os.path.abspath(os.path.join(file_directory, os.pardir))
         file_directory += f"\\json\\"
@@ -275,19 +288,11 @@ class ClientMongo:
             if table_name in tables:
                 attributes = tables[table_name]['Attributes']
                 print("ATTRIBUTES", attributes)
-                print("AT NAME ",attribute_name)
-                # Check if the specified attribute exists in the table
-                if attribute_name in attributes:
-                    # Check if the attribute is part of any index
-                    print("ATTRIBUTES NAME", attribute_name)
-                    for index_name, index_definition in indexes_dict.items():
-                        print("INDEXEEEES ",index_name,"       ",index_definition)
-                        table_and_attributes = index_definition.strip("()").split(", ")
-                        print("TABLE AND ATTRIBUTES",table_and_attributes)
-                        if table_name in table_and_attributes[0]:
-                            print("TABLE AND ATTRIBUTES2222",table_name,"     ",table_and_attributes[0])
-                            position = table_and_attributes.index(attribute_name) - 1
-                            print("POSITION",position)
-                            return {position + 1}
+                print("ATtribute NAME",attribute_name)
+                position = None
+                for idx, key in enumerate(attributes, start = 1):
+                    if key == attribute_name:
+                        position = idx
 
-        return 0
+
+        return position
