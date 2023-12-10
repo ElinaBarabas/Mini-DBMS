@@ -50,7 +50,6 @@ class ClientMongo:
                 else:
                     non_unique_index = table_values[table_name]["Keys"]["FK"]
                     non_unique_index_fk = next(iter(non_unique_index))
-                    print("FK nnn", non_unique_index_fk)
                     collection_name = "INDEX_FK_" + table_name + "_" + non_unique_index_fk[0]
                     if collection_name not in db.list_collection_names():  # Check if the collection exists
                         db.create_collection(collection_name)
@@ -134,122 +133,122 @@ class ClientMongo:
         # Check if a document with the specified _id already exists
         existing_doc = collection.find_one({"_id": id})
 #check if the speified id alredy exists
-        if existing_doc is not None:
-            # Document with the specified _id already exists
-            raise Exception (f"Document with _id {id} already exists")
-        elif not unique:
-            try:
-# Document with the specified _id does not exist and there are no unique indexes so you can insert it without checking the unicity
-                data = {
-                    "_id": id,
-                    "Value": attributes
+        functie = self.check_insert(database_name, table_name,attributes)
+        if functie == 1:
+            if existing_doc is not None:
+                # Document with the specified _id already exists
+                raise Exception (f"Document with _id {id} already exists")
+
+            elif not unique:
+                try:
+
+    # Document with the specified _id does not exist and there are no unique indexes so you can insert it without checking the unicity
+                    data = {
+                        "_id": id,
+                        "Value": attributes
+                        }
+                    collection.insert_one(data)
+                    print(f"Data inserted with custom _id: {id}")
+        # function to add in index non-unique file too
+                    if non_unique:
+                        value_index=""
+                        attributes = attributes.split("#") #to add 1#2#4
+                        for key,value in non_unique.items():
+                            n_index = value.strip("()").split(",")[1:]
+                            for n in n_index:
+                                n ="".join(n.split())
+                                position = self.return_attribute_position(database_name, table_name, n)
+                                value_index = attributes[position-2]
+                                collection_index_name = "INDEX_"+ table_name + "_" + key
+                                collection_index = db[collection_index_name]
+                                index_doc = collection_index.find_one({"_id": value_index})
+                                value_index = str(value_index)
+                                if index_doc is None and value_index != "":
+                                    data_index = {
+                                        "_id": value_index,
+                                        "Value": id
+                                    }
+                                    collection_index.insert_one(data_index)
+                                    print(f"Data inserted with custom _id for NON UNIQUE INDEX: {id}")
+                                else:
+                                    concatenated_id = str(index_doc['Value']) + "#" + str(id)
+                                    document_id = value_index
+                                    new_value = {'Value': concatenated_id}
+                                    collection_index.update_one({'_id':document_id},{'$set':new_value})
+                                    print(f"Data inserted with custom _id for NON UNIQUE INDEX: {value_index}")
+
+                except Exception as e:(" Exception for non unique indexes")
+
+            else: #it means that there are unique indexes so we need to check it.
+
+                try: #check if you can add unique indexes
+                    value_index = ""
+                    attributes2 = attributes.split("#")  # to add 1#2#4
+                    for key, value in unique.items():
+                        n_index = value.strip("()").split(",")[1:]
+                        for n in n_index:
+                            n = "".join(n.split())
+                            position = self.return_attribute_position(database_name, table_name, n)
+                            value_index = attributes2[position - 2]
+                            collection_index_name = "INDEX_" + table_name + "_" + key
+                            collection_index = db[collection_index_name]
+                            index_doc = collection_index.find_one({"_id": value_index})
+                            value_index = str(value_index)
+
+                            if index_doc is None and value_index != "":
+
+                                data_index = {
+                                    "_id": value_index,
+                                    "Value": id
+                                }
+                                collection_index.insert_one(data_index)
+                                print(f"Data inserted with custom _id for UNIQUE INDEX: {id}")
+                            if index_doc is not None:
+
+                                raise Exception (f"Data with custom _id for UNIQUE INDEX : {value_index} already exists.")
+
+                    #add the data if the exception is not thrown
+
+                    data = {
+                        "_id": id,
+                        "Value": attributes
                     }
-                collection.insert_one(data)
-                print(f"Data inserted with custom _id: {id}")
-    # function to add in index non-unique file too
-                if non_unique:
-                    value_index=""
-                    attributes = attributes.split("#") #to add 1#2#4
-                    for key,value in non_unique.items():
-                        n_index = value.strip("()").split(",")[1:]
-                        for n in n_index:
-                            n ="".join(n.split())
-                            position = self.return_attribute_position(database_name, table_name, non_unique, n)
-                            value_index = attributes[position-2]
-                            collection_index_name = "INDEX_"+ table_name + "_" + key
-                            collection_index = db[collection_index_name]
-                            print("INDEX NAME IS   : ",collection_index_name)
-                            index_doc = collection_index.find_one({"_id": value_index})
-                            value_index = str(value_index)
-                            if index_doc is None and value_index != "":
-                                data_index = {
-                                    "_id": value_index,
-                                    "Value": id
-                                }
-                                collection_index.insert_one(data_index)
-                                print(f"Data inserted with custom _id for NON UNIQUE INDEX: {id}")
-                            else:
-                                concatenated_id = str(index_doc['Value']) + "#" + str(id)
-                                document_id = value_index
-                                new_value = {'Value': concatenated_id}
-                                collection_index.update_one({'_id':document_id},{'$set':new_value})
-                                print(f"Data inserted with custom _id for NON UNIQUE INDEX: {value_index}")
+                    collection.insert_one(data)
+                    print(f"(!)Data inserted with custom _id: {id}")
+                    #check if there are non unique indexes and add those too
+                    if non_unique:
+                        value_index=""
+                        attributes = attributes.split("#") #to add 1#2#4
+                        for key,value in non_unique.items():
+                            n_index = value.strip("()").split(",")[1:]
 
-            except Exception as e:(" Exception for non unique indexes")
+                            for n in n_index:
+                                n ="".join(n.split())
+                                position = self.return_attribute_position(database_name, table_name, n)
+                                value_index = attributes[position-2]
+                                collection_index_name = "INDEX_"+ table_name + "_" + key
+                                collection_index = db[collection_index_name]
 
-        else: #it means that there are unique indexes so we need to check it.
+                                index_doc = collection_index.find_one({"_id": value_index})
+                                value_index = str(value_index)
+                                if index_doc is None and value_index != "":
+                                    data_index = {
+                                        "_id": value_index,
+                                        "Value": id
+                                    }
+                                    collection_index.insert_one(data_index)
+                                    print(f"Data inserted with custom _id for INDEX: {id}")
+                                else:
+                                    concatenated_id = str(index_doc['Value']) + "#" + str(id)
+                                    document_id = value_index
+                                    new_value = {'Value': concatenated_id}
+                                    collection_index.update_one({'_id':document_id},{'$set':new_value})
+                                    print(f"Data inserted with custom _id for INDEX: {value_index}")
 
-            try: #check if you can add unique indexes
-                value_index = ""
-                attributes = attributes.split("#")  # to add 1#2#4
-                for key, value in unique.items():
-                    n_index = value.strip("()").split(",")[1:]
-                    for n in n_index:
-                        n = "".join(n.split())
-                        position = self.return_attribute_position(database_name, table_name, unique, n)
-                        print (position)
-                        for i in attributes:
-                            print("ATTRIBUTE NAME IS   : ",i)
-                        value_index = attributes[position - 1]
-                        print(value_index)
-                        collection_index_name = "INDEX_" + table_name + "_" + key
-                        collection_index = db[collection_index_name]
-                        print("collection_index_unique: ", collection_index_name)
-                        index_doc = collection_index.find_one({"_id": value_index})
-                        print("index_doc: ", index_doc,"and value index: ", value_index)
-                        value_index = str(value_index)
-
-                        if index_doc is None and value_index != "":
-
-                            data_index = {
-                                "_id": value_index,
-                                "Value": id
-                            }
-                            collection_index.insert_one(data_index)
-                            print(f"Data inserted with custom _id for UNIQUE INDEX: {id}")
-                        if index_doc is not None:
-                            print("intra aici?")
-                            raise Exception (f"Data with custom _id for UNIQUE INDEX : {value_index} already exists.")
-                            print("da aici ?")
-                #add the data if the exception is not thrown
-                data = {
-                    "_id": id,
-                    "Value": attributes
-                }
-                collection.insert_one(data)
-                print(f"(!)Data inserted with custom _id: {id}")
-                #check if there are non unique indexes and add those too
-                if non_unique:
-                    value_index=""
-                    attributes = attributes.split("#") #to add 1#2#4
-                    for key,value in non_unique.items():
-                        n_index = value.strip("()").split(",")[1:]
-                        print("Key: ", key)
-                        for n in n_index:
-                            n ="".join(n.split())
-                            position = self.return_attribute_position(database_name, table_name, non_unique, n)
-                            value_index = attributes[position-2]
-                            collection_index_name = "INDEX_"+ table_name + "_" + key
-                            collection_index = db[collection_index_name]
-                            print("collection_index: ",collection_index_name)
-                            index_doc = collection_index.find_one({"_id": value_index})
-                            value_index = str(value_index)
-                            if index_doc is None and value_index != "":
-                                data_index = {
-                                    "_id": value_index,
-                                    "Value": id
-                                }
-                                collection_index.insert_one(data_index)
-                                print(f"Data inserted with custom _id for INDEX: {id}")
-                            else:
-                                concatenated_id = str(index_doc['Value']) + "#" + str(id)
-                                document_id = value_index
-                                new_value = {'Value': concatenated_id}
-                                collection_index.update_one({'_id':document_id},{'$set':new_value})
-                                print(f"Data inserted with custom _id for INDEX: {value_index}")
-
-            except Exception as e:
-                print(f"Exception for unique indexes {str(e)}")
+                except Exception as e:
+                    print(f"Exception for unique indexes {str(e)}")
+        else:
+            raise Exception("There is no such attribute in the references table!")
 
     def delete_mongoDB(self, id, database_name, table_name):  # deletes data based on _id  in a collection
         db = self.client[database_name]
@@ -318,7 +317,7 @@ class ClientMongo:
         return unique_indexes, non_unique_indexes
 
 
-    def return_attribute_position(self,database_name,table_name,indexes_dict,attribute_name):
+    def return_attribute_position(self,database_name,table_name,attribute_name):
         attribute_name = attribute_name.replace(" ", "")
         file_directory = os.getcwd()
         file_directory = os.path.abspath(os.path.join(file_directory, os.pardir))
@@ -352,8 +351,6 @@ class ClientMongo:
             # Check if the specified table exists in the database
             if table_name in tables:
                 attributes = tables[table_name]['Attributes']
-                print("ATTRIBUTES", attributes)
-                print("ATtribute NAME",attribute_name)
                 position = None
                 for idx, key in enumerate(attributes, start = 1):
                     if key == attribute_name:
@@ -361,3 +358,60 @@ class ClientMongo:
 
 
         return position
+
+    def check_insert(self, database_name, table_name, attributes):
+        print("Check insert function: ",database_name, table_name)
+        file_directory = os.getcwd()
+        file_directory = os.path.abspath(os.path.join(file_directory, os.pardir))
+        file_directory += f"\\json\\"
+
+        current_directory = file_directory
+        existing_files = os.listdir(current_directory)
+
+        file_name = f"{database_name}.json"
+
+        database_exists = 0
+
+        for file in existing_files:
+            if file == file_name:
+                database_exists = 1
+        if database_exists == 0:
+            raise Exception(f"There is no database with this name {database_name}")
+        file_path = os.path.join(file_directory, file_name)
+
+        if not os.path.isfile(file_path):
+            print(f"Error: File '{file_path}' does not exist.")
+        try:
+            with open(file_path, 'r') as json_file:
+                data = json.load(json_file)
+            if not (data[database_name.upper()]["Tables"][table_name]):
+                print(f"There is no such table {table_name}")
+            if "FK" in data[database_name.upper()]["Tables"][table_name]["Keys"]:
+                fk = data[database_name.upper()]["Tables"][table_name]["Keys"]["FK"]
+                table_attribute = []
+                for value in fk.values():
+                    if '(' in value and ')' in value:
+                        table_attribute.extend(value.strip('()').split(', '))
+                if table_attribute == []:
+                    return 1
+                else:
+                    fk_table = data[database_name.upper()]["Tables"][table_attribute[0]]
+                    print("fk table:", fk_table)
+                    pos = self.return_attribute_position(database_name.upper(),table_attribute[0],table_attribute[1] )
+                    value_check = attributes.split("#")[pos-2]
+                    db = self.client[database_name]
+                    collection_list = db.list_collection_names()
+                    if table_attribute[0] in collection_list:
+                        collection = db[table_attribute[0]]
+                        print(collection)
+                        cursor = collection.find({})
+                        for document in cursor:
+                            key = document['_id']
+                            value = document['Value']
+                            value2 = value.split('#')[pos-2]
+                            if value2 == value_check:
+                                return 1
+
+                    return 0
+        except Exception as e:
+            print(f"An error occurred: {str(e)}")

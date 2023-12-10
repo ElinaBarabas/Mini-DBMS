@@ -35,7 +35,7 @@
                 "Keys": {
                     "PK": "unu",
                     "FK": {
-                        "numefk": "(tets, unu)"
+                        "numefk": "(tets, doi)"
                     }
                 }
             }
