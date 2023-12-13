@@ -1,0 +1,66 @@
+{
+    "test1": {
+        "Tables": {
+            "student": {
+                "Attributes": {
+                    "id": "int",
+                    "nume": "varchar"
+                },
+                "Keys": {
+                    "PK": "id",
+                    "FK": {}
+                }
+            },
+            "grade": {
+                "Attributes": {
+                    "unu": "int",
+                    "doi": "int",
+                    "trei": "varchar"
+                },
+                "Keys": {
+                    "PK": "unu",
+                    "FK": {}
+                }
+            },
+            "ttt": {
+                "Attributes": {
+                    "unu": "int",
+                    "doi": "int",
+                    "3": "varchar",
+                    "numefk": "varchar"
+                },
+                "Keys": {
+                    "PK": "unu",
+                    "FK": {
+                        "numefk": "(student, nume)"
+                    }
+                }
+            },
+            "newtable": {
+                "Attributes": {
+                    "i1": "int",
+                    "i2": "int",
+                    "trei": "varchar",
+                    "fkDoi": "int"
+                },
+                "Keys": {
+                    "PK": "i1",
+                    "FK": {
+                        "fkDoi": "(ttt, doi)"
+                    }
+                }
+            }
+        },
+        "Indexes": {
+            "Unique": {
+                "newindex": "(student, nume)",
+                "composite": "(grade, doi, trei)",
+                "newTable_i2": "(newtable, i2)",
+                "index3": "(ttt, 3)"
+            },
+            "NonUnique": {
+                "index_name5": "(student, nume)"
+            }
+        }
+    }
+}

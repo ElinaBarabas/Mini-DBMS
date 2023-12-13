@@ -1,8 +1,7 @@
-from InputManipulator import InputManipulator
 import socket
-import json
-import os
-from pymongo import MongoClient
+
+from InputManipulator import InputManipulator
+
 
 def client_program():
     try:
@@ -22,10 +21,10 @@ def client_program():
 
                 client_socket.send(user_input.encode())
                 server_response = client_socket.recv(1024).decode()
-                print("\nServer says:", server_response)
+                print("\nServer-Side says:", server_response)
 
             except Exception as e:
-                print("\nAn error occurred:", str(e))
+                print("\nCLIENT: An error occurred:", str(e))
 
         client_socket.close()
     except Exception as e:
@@ -34,4 +33,3 @@ def client_program():
 
 if __name__ == '__main__':
     client_program()
-
