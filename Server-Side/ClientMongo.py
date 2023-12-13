@@ -86,10 +86,6 @@ class ClientMongo:
                     print(f"Table: {collection} will be deleted")
                     database[collection].drop()
 
-                # for index_collection in index_collections_to_delete:
-                #     print(f"INDEX Table: {index_collection} will be deleted")
-                #     database[index_collection].drop()
-
     def get_indexes_from_json(self, database_name, collection_name):
         database_file_name = f"{database_name.lower()}.json"
         if self.check_database_existence(database_file_name):
