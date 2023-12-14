@@ -466,7 +466,10 @@ class ClientMongo:
 
         if is_select_all:  # select * from grade on test1
             for document in collection.find():
-                entry_values = "\n" + str(document.get('_id')) + " " + str(document.get('Value'))
+                value = str(document.get('Value'))
+                value = value.replace("#", ", ")
+                value = value[0:-2]
+                entry_values = "\n" + str(document.get('_id')) + " " + value
                 resulted_entries += entry_values
 
         else:  # select doi, trei from grade on test1
@@ -491,10 +494,11 @@ class ClientMongo:
         database = self.client[database_name]
         collection = database[collection_name]
 
-        result_ids = []
-        result_values = []
+        result_data = {}
 
         for column in column_list: # TODO Find a solution for 3 columns
+
+            result_data[column] = []
             if pk_key == column:
                 position = -10
             else:
@@ -508,17 +512,21 @@ class ClientMongo:
                 entry_value = str(document.get('Value'))
 
                 if position == -10:
-                    result_ids.append(str(entry_id))
+                    result_data[column].append(str(entry_id))
                 else:
-                    entry_values_list = entry_value.split("#")[position - 1]
-                    result_values.append(entry_values_list)
+                    entry_values_list = entry_value.split("#")[position - 1].strip("#")
+                    result_data[column].append(entry_values_list)
 
         final = ""
 
-        for i in range(0, len(result_values)):          #TODO only for index
-            if len(result_ids) > 0:
-                final += "\n" + result_ids[i] + " " + result_values[i]
-            else:
-                final += "\n" + result_values[i]
+        for column, values in result_data.items():
+            print(f"Column: {column}")
+            for value in values:
+                print(f"  Value: {value}")
+
+        for i in range(len(result_data[column_list[0]])):  # Assuming all columns have the same number of entries
+            entry_values = [result_data[column][i] for column in column_list]
+            final += f"\n{', '.join(map(str, entry_values))}"
 
         return final
+
