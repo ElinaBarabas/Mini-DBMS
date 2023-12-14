@@ -18,6 +18,7 @@ def server_program():
 
         while data != "exit":
 
+            data = ""
             try:
 
                 data = conn.recv(1024).decode()
@@ -70,11 +71,22 @@ def server_program():
                         id_value = _id
                     mongo.delete_data_mongoDB(id_value, instance_name, table_name)
 
+                elif command_type == "select":  # select * from grade on table_name
+                    instance_name_index = commands.index("from") + 1
+                    table_name = commands[instance_name_index]
+
+                    database_name_index = commands.index("on") + 1
+                    database_name = commands[database_name_index]
+
+                    result_entries = mongo.select_data_mongoDB(commands, database_name, table_name)
+                    data = result_entries
+                    # conn.send(result_entries.encode())
+
                 print("\n>> Command executed")
 
-                if client_request != "exit":
+                if client_request != "exit" and not data:
                     data = "completed"
-                else:
+                elif not data:
                     data = "exit"
                 conn.send(data.encode())
 

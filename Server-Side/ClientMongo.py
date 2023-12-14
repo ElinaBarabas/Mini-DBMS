@@ -435,3 +435,90 @@ class ClientMongo:
                 if collection.startswith(collection_name) or fk_substring in collection:
                     database.drop_collection(collection)
             return True
+
+    def select_data_mongoDB(self, commands, database_name, collection_name):
+
+        database_file_name = f"{database_name.lower()}.json"
+
+        if not self.check_database_existence(database_file_name):
+            raise Exception(f"There is no such database: {database_name}")
+
+        database = self.client[database_name]
+        collection_list = database.list_collection_names()
+
+        if collection_name not in collection_list:
+            raise Exception(f"There is no such table: {collection_name} in {database_name}")
+
+        if "where" not in commands:
+            result_entries = self.simple_select_mongoDB(commands, database_name, collection_name)
+        else:
+            result_entries = self.complex_select_mongoDB(commands, database_name, collection_name)
+
+        return result_entries
+
+    def simple_select_mongoDB(self, commands, database_name, collection_name):
+
+        is_select_all = True if commands[1] == "*" else False
+        resulted_entries = ""
+
+        database = self.client[database_name]
+        collection = database[collection_name]
+
+        if is_select_all:  # select * from grade on test1
+            for document in collection.find():
+                entry_values = "\n" + str(document.get('_id')) + " " + str(document.get('Value'))
+                resulted_entries += entry_values
+
+        else:  # select doi, trei from grade on test1
+
+            select_keyword_index = commands.index("select")
+            from_keyword = commands.index("from")
+
+            column_names = commands[select_keyword_index + 1: from_keyword][0]
+            column_names_list = column_names.split(',')
+
+            resulted_entries = self.parse_attributes(database_name, collection_name, column_names_list)
+
+        return resulted_entries
+
+    def complex_select_mongoDB(self, commands, database_name, collection_name):
+        print("complex")
+
+    def parse_attributes(self, database_name, collection_name, column_list):
+
+        pk_key = self.get_primary_key(database_name, collection_name)
+
+        database = self.client[database_name]
+        collection = database[collection_name]
+
+        result_ids = []
+        result_values = []
+
+        for column in column_list: # TODO Find a solution for 3 columns
+            if pk_key == column:
+                position = -10
+            else:
+                position = self.get_attribute_position(database_name, collection_name, column) - 1
+
+            if position == -2:
+                raise Exception(f"There is no such column {column} in {collection_name}")
+
+            for document in collection.find():
+                entry_id = document.get("_id")
+                entry_value = str(document.get('Value'))
+
+                if position == -10:
+                    result_ids.append(str(entry_id))
+                else:
+                    entry_values_list = entry_value.split("#")[position - 1]
+                    result_values.append(entry_values_list)
+
+        final = ""
+
+        for i in range(0, len(result_values)):          #TODO only for index
+            if len(result_ids) > 0:
+                final += "\n" + result_ids[i] + " " + result_values[i]
+            else:
+                final += "\n" + result_values[i]
+
+        return final

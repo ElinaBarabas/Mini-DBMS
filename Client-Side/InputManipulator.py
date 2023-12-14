@@ -26,3 +26,6 @@ class InputManipulator:
 
             if instance_type not in valid_instance_types:
                 raise Exception("Instance type for create/drop is required (database, table, index)")
+
+        if command_type == "select" and "from" not in command_parts and "on" not in command_parts:
+            raise Exception("Incomplete select command")
