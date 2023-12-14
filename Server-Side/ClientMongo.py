@@ -485,7 +485,18 @@ class ClientMongo:
         return resulted_entries
 
     def complex_select_mongoDB(self, commands, database_name, collection_name):
-        print("complex")
+        where_keyword_index = commands.index("where")
+        on_keyword = commands.index("on")
+
+        where_clause = commands[where_keyword_index + 1: on_keyword]
+
+        count_clauses = 1
+
+        for clause in where_clause:
+            if clause == "and":
+                count_clauses += 1
+
+        print(count_clauses)
 
     def parse_attributes(self, database_name, collection_name, column_list):
 
@@ -496,7 +507,7 @@ class ClientMongo:
 
         result_data = {}
 
-        for column in column_list: # TODO Find a solution for 3 columns
+        for column in column_list:
 
             result_data[column] = []
             if pk_key == column:
