@@ -14,6 +14,15 @@ class ClientMongo:
         self.json_files = [file for file in os.listdir(self.json_directory) if file.endswith('.json')]
 
     @staticmethod
+    def check_comparison(value1, value2, operator):
+        if operator == '=':
+            return value1 == value2
+        elif operator == '>':
+            return value1 > value2
+        elif operator == '<':
+            return value1 < value2
+
+    @staticmethod
     def create_collection(database, collection_name):
         if collection_name not in database.list_collection_names():
             database.create_collection(collection_name)
@@ -488,15 +497,145 @@ class ClientMongo:
         where_keyword_index = commands.index("where")
         on_keyword = commands.index("on")
 
+        resulted_entries = ""
+
         where_clause = commands[where_keyword_index + 1: on_keyword]
 
         count_clauses = 1
 
+        existing_attributes = self.get_attributes_list(database_name, collection_name)
+
         for clause in where_clause:
             if clause == "and":
                 count_clauses += 1
+            else:  # TODO SIMILAR FOR THE LIKE OPERATOR
+                if '=' in clause:
+                    operator = '='
+                elif '>' in clause:
+                    operator = '>'
+                elif '<' in clause:
+                    operator = '<'
+                else:
+                    raise Exception("Invalid operator")
 
-        print(count_clauses)
+                clause_values = clause.strip().split(operator)
+                attribute_name = clause_values[0]
+                attribute_value = clause_values[1]
+
+                if attribute_name not in existing_attributes:
+                    raise Exception(f"There is no such column {attribute_name} in {collection_name}")
+
+                database = self.client[database_name]
+
+                unique_index_names, non_unique_index_names = self.get_index_names_for_column(database_name,
+                                                                                             collection_name,
+                                                                                             attribute_name)
+
+                if unique_index_names:
+                    for unique_index_name in unique_index_names:
+                        index_file_name = f"{collection_name}_Unique_{unique_index_name}_INDEX"
+                        print(index_file_name)
+                        collection = database[index_file_name]
+                        cursor = collection.find({})
+                        for document in cursor:
+                            entry_id = document.get("_id")
+                            result = self.check_comparison(entry_id, attribute_value, operator)
+                            if result:
+                                entity_id = document.get('Value')
+
+                                if "#" not in str(entity_id):  # one entry as value
+                                    try:
+                                        entity_id = int(entity_id)
+                                    except ValueError:
+                                        entity_id = entity_id
+                                    new_collection = database[collection_name]
+                                    existing_document = new_collection.find_one({"_id": entity_id})
+                                    value = str(existing_document.get('Value'))
+                                    value = value.replace("#", ", ")
+                                    value = value[0:-2]
+                                    entry_values = "\n" + str(existing_document.get("_id")) + " " + value
+                                    resulted_entries += entry_values
+                                else:  # multiple entries with the same index value
+                                    entity_ids = entity_id
+                                    entity_ids_list = entity_ids.split("#")
+                                    for entry in entity_ids_list:
+
+                                        try:
+                                            entry = int(entry)
+                                        except ValueError:
+                                            entry = entry
+                                        new_collection = database[collection_name]
+                                        existing_document = new_collection.find_one({"_id": entry})
+                                        value = str(existing_document.get('Value'))
+                                        value = value.replace("#", ", ")
+                                        value = value[0:-2]
+                                        entry_values = "\n" + str(existing_document.get("_id")) + " " + value
+                                        resulted_entries += entry_values
+
+                if non_unique_index_names:
+                    for non_unique_index_name in non_unique_index_names:
+                        index_file_name = f"{collection_name}_NonUnique_{non_unique_index_name}_INDEX"
+                        collection = database[index_file_name]
+                        cursor = collection.find({})
+                        for document in cursor:
+                            entry_id = document.get("_id")
+                            result = self.check_comparison(entry_id, attribute_value, operator)
+                            if result:
+                                entity_id = document.get('Value')
+
+                                if "#" not in str(entity_id):      # one entry as value
+                                    try:
+                                        entity_id = int(entity_id)
+                                    except ValueError:
+                                        entity_id = entity_id
+
+                                    new_collection = database[collection_name]
+                                    existing_document = new_collection.find_one({"_id": entity_id})
+                                    value = str(existing_document.get('Value'))
+                                    value = value.replace("#", ", ")
+                                    value = value[0:-2]
+                                    entry_values = "\n" + str(existing_document.get("_id")) + " " + value
+                                    resulted_entries += entry_values
+                                else:                         # multiple entries with the same index value
+                                    entity_ids = entity_id
+                                    entity_ids_list = entity_ids.split("#")
+                                    for entry in entity_ids_list:
+
+                                        try:
+                                            entry = int(entry)
+                                        except ValueError:
+                                            entry = entry
+
+                                        new_collection = database[collection_name]
+                                        existing_document = new_collection.find_one({"_id": entry})
+                                        value = str(existing_document.get('Value'))
+                                        value = value.replace("#", ", ")
+                                        value = value[0:-2]
+                                        entry_values = "\n" + str(existing_document.get("_id")) + " " + value
+                                        resulted_entries += entry_values
+            return resulted_entries
+
+    def get_index_names_for_column(self, database_name, collection_name, attribute_name):
+
+        unique_indexes, non_unique_indexes = self.get_indexes_from_json(database_name, collection_name)
+        unique_index_names = []
+        non_unique_index_names = []
+
+        for unique_index in unique_indexes.items():
+            index_name = unique_index[0]
+            index_collections = unique_index[1]
+
+            if attribute_name in index_collections:
+                unique_index_names.append(index_name)
+
+        for non_unique_index in non_unique_indexes.items():
+            index_name = non_unique_index[0]
+            index_collections = non_unique_index[1]
+
+            if attribute_name in index_collections:
+                non_unique_index_names.append(index_name)
+
+        return unique_index_names, non_unique_index_names
 
     def parse_attributes(self, database_name, collection_name, column_list):
 
@@ -541,3 +680,19 @@ class ClientMongo:
 
         return final
 
+    def get_attributes_list(self, database_name, collection_name):
+        database_file_name = f"{database_name.lower()}.json"
+        existing_attributes = []
+        if self.check_database_existence(database_file_name):
+            file_path = os.path.join(self.json_directory, database_file_name)
+
+            with open(file_path, 'r') as json_file:
+                json_data = json.load(json_file)
+
+                if database_name in json_data:
+                    collections = json_data[database_name]['Tables']
+                if collection_name in collections:
+                    attributes = collections[collection_name]['Attributes']
+                    for attribute in attributes.keys():
+                        existing_attributes.append(attribute)
+        return existing_attributes
