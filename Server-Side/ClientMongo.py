@@ -738,3 +738,46 @@ class ClientMongo:
                     for attribute in attributes.keys():
                         existing_attributes.append(attribute)
         return existing_attributes
+
+    def join(self, commands, database_name):  #select * from ttt join student on ttt.numefk=student.nume in test1
+        commands = commands.split()
+
+        join_keyword_index = commands.index("join")
+        first_collection_name = commands[join_keyword_index - 1]
+        second_collection_name = commands[join_keyword_index + 1]
+
+        print(first_collection_name, "with", second_collection_name)
+
+        database = self.client[database_name]
+        collections_list = database.list_collection_names()
+
+        if first_collection_name not in collections_list or second_collection_name not in collections_list:
+            raise Exception(f"Both tables {first_collection_name, second_collection_name} must exist in the database {database_name}!")
+
+        join_columns = ''
+        for command in commands:
+            if "=" in command:
+                join_columns = command
+
+        if not join_columns:
+            raise Exception("No condition for join!")
+
+        join_columns = join_columns.split("=")
+        left_hand_side = join_columns[0]
+        right_hand_side = join_columns[1]
+
+        left_collection_name, left_collection_attribute = left_hand_side.split('.')
+        right_collection_name, right_collection_attribute = right_hand_side.split('.')
+
+        if left_collection_name == first_collection_name and right_collection_name == second_collection_name:
+            left_existing_attributes = self.get_attributes_list(database_name, left_collection_name)
+            right_existing_attributes = self.get_attributes_list(database_name, right_collection_name)
+
+            if left_collection_attribute not in left_existing_attributes:
+                raise Exception(f"The join column {left_collection_attribute} does not exist in the {left_collection_name} ")
+
+            if right_collection_attribute not in right_existing_attributes:
+                raise Exception(f"The join column {right_collection_attribute} does not exist in the {right_collection_name} ")
+
+            print("The join conditions are correct!")
+        raise Exception(f"The join tables are not the same")
