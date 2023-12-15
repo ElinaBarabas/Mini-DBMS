@@ -642,6 +642,10 @@ class ClientMongo:
                             value_to_compare = value_list[position - 2]
                             result = self.check_comparison(value_to_compare, attribute_value, operator)
                         else:
+                            try:
+                                attribute_value = int(attribute_value)
+                            except ValueError:
+                                attribute_value = attribute_value
                             result = self.check_comparison(entry_id, attribute_value, operator)
                         if result:
 
