@@ -88,6 +88,9 @@ def server_program():
                     data = "completed"
                 elif not data:
                     data = "exit"
+
+                if data.startswith(command_type):
+                    data = "completed"
                 conn.send(data.encode())
 
             except Exception as e:

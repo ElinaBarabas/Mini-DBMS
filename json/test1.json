@@ -49,6 +49,22 @@
                         "fkDoi": "(ttt, doi)"
                     }
                 }
+            },
+            "t2": {
+                "Attributes": {
+                    "unu": "int",
+                    "doi": "int",
+                    "trei": "varchar",
+                    "numefk": "varchar",
+                    "intfk": "int"
+                },
+                "Keys": {
+                    "PK": "unu",
+                    "FK": {
+                        "numefk": "(newtable, trei)",
+                        "intfk": "(student, id)"
+                    }
+                }
             }
         },
         "Indexes": {
@@ -56,7 +72,7 @@
                 "newindex": "(student, nume)",
                 "composite": "(grade, doi, trei)",
                 "newTable_i2": "(newtable, i2)",
-                "index3": "(ttt, 3)"
+                "index1": "(t2, trei)"
             },
             "NonUnique": {
                 "index_name5": "(student, nume)"

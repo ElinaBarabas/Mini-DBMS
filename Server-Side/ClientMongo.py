@@ -246,12 +246,14 @@ class ClientMongo:
                     index_values_str = "_".join(str(v) for v in index_values)
                     collection_index_name = f"{collection_name}_NonUnique_{key}_INDEX"
                     collection_index = database[collection_index_name]
-                    index_document = collection_index.find_one({"_id": index_values_str})
+
 
                     try:  # convert the _id into an integer(if it was given as integer) or let it string
                         index_values_str = int(index_values_str)
                     except ValueError:
                         index_values_str = index_values_str
+
+                    index_document = collection_index.find_one({"_id": index_values_str})
 
                     if index_document is None:
                         data_index = {
@@ -278,12 +280,14 @@ class ClientMongo:
                     index_values_str = "_".join(str(v) for v in index_values)
                     collection_index_name = f"{collection_name}_Unique_{key}_INDEX"
                     collection_index = database[collection_index_name]
-                    index_document = collection_index.find_one({"_id": index_values_str})
 
                     try:  # convert the _id into an integer(if it was given as integer) or let it string
                         index_values_str = int(index_values_str)
                     except ValueError:
                         index_values_str = index_values_str
+
+                    index_document = collection_index.find_one({"_id": index_values_str})
+
 
                     if index_document is None:
                         data_index = {
@@ -508,7 +512,7 @@ class ClientMongo:
         for clause in where_clause:
             if clause == "and":
                 count_clauses += 1
-            else:  # TODO SIMILAR FOR THE LIKE OPERATOR
+            else:  # TODO (y) op
                 if '=' in clause:
                     operator = '='
                 elif '>' in clause:
@@ -613,6 +617,40 @@ class ClientMongo:
                                         value = value[0:-2]
                                         entry_values = "\n" + str(existing_document.get("_id")) + " " + value
                                         resulted_entries += entry_values
+
+                if not unique_index_names and not non_unique_index_names:  # there are no indices for the given column
+
+                    collection = database[collection_name]
+                    cursor = collection.find({})
+                    pk_key = self.get_primary_key(database_name, collection_name)
+
+                    for document in cursor:
+                        entry_id = document.get("_id")
+
+                        if attribute_name != pk_key:
+                            position = self.get_attribute_position(database_name, collection_name, attribute_name)
+
+                            entry_value = document.get('Value')
+
+                            if "#" not in str(entry_value):  # one entry as value
+                                try:
+                                    entry_value = int(entry_value)
+                                except ValueError:
+                                    entry_value = entry_value
+
+                            value_list = str(entry_value).split("#")
+                            value_to_compare = value_list[position - 2]
+                            result = self.check_comparison(value_to_compare, attribute_value, operator)
+                        else:
+                            result = self.check_comparison(entry_id, attribute_value, operator)
+                        if result:
+
+                                value = document.get('Value')
+                                value = value.replace("#", ", ")
+                                value = value[0:-2]
+                                entry_values = "\n" + str(entry_id) + " " + value
+                                resulted_entries += entry_values
+
             return resulted_entries
 
     def get_index_names_for_column(self, database_name, collection_name, attribute_name):
