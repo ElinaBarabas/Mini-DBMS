@@ -59,7 +59,9 @@ def server_program():
                 elif command_type == "insert" and instance_type == "into":  # insert into db_name table_name values (1,2,3)
                     table_name = commands[3].lower()
                     _id, attributes = controller.mongoDB_format(instance_name, table_name, client_request)
-                    mongo.insert_data_mongoDB(_id, attributes, instance_name, table_name)
+                    response = mongo.insert_data_mongoDB(_id, attributes, instance_name, table_name)
+                    if response:
+                        data = response
                     mongo.update_mongoDB()
 
                 elif command_type == "delete" and instance_type == "from":  # delete from db_name table_name value id_value

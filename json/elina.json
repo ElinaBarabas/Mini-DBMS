@@ -1,0 +1,52 @@
+{
+    "elina": {
+        "Tables": {
+            "student": {
+                "Attributes": {
+                    "id": "int",
+                    "cop": "varchar"
+                },
+                "Keys": {
+                    "PK": "id",
+                    "FK": {}
+                }
+            },
+            "group": {
+                "Attributes": {
+                    "unu": "int",
+                    "doi": "int",
+                    "3": "varchar",
+                    "numefk": "int"
+                },
+                "Keys": {
+                    "PK": "unu",
+                    "FK": {
+                        "numefk": "(student, id)"
+                    }
+                }
+            },
+            "name": {
+                "Attributes": {
+                    "unu": "int",
+                    "doi": "int",
+                    "3": "varchar",
+                    "numefk": "int",
+                    "k": "varchar"
+                },
+                "Keys": {
+                    "PK": "unu",
+                    "FK": {
+                        "numefk": "(student, id)"
+                    }
+                }
+            }
+        },
+        "Indexes": {
+            "Unique": {
+            },
+            "NonUnique": {
+                "nui": "(name, doi)"
+            }
+        }
+    }
+}

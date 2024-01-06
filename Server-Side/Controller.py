@@ -96,9 +96,24 @@ class Controller:
             elif field.__contains__("FK"):
                 if not attribute_pair[1] == "int" and not attribute_pair[1] == "varchar":
                     raise Exception("Field types must be int or varchar")
-                fields_map[attribute_pair[2]] = attribute_pair[1]
+
+                print("FIELD")
+                print(field)
+
                 fk_value = attribute_pair[2]
                 table_name, table_column = field.split("ref ")[1].split("-")
+
+                attributes_json = self.get_table_attributes(database_name, table_name)
+                pk_data = attributes_json["PK"]
+                for key in pk_data:
+                    pk_name = key.strip()
+
+                    if table_column.strip() != pk_name:
+                        raise Exception("The FK must be the primary key of the parent table")
+
+
+                fields_map[attribute_pair[2]] = attribute_pair[1]
+
                 fk_builder = {"fk_name": fk_value, "table": table_name, "column": table_column}
                 fk_values.append(fk_builder)
 

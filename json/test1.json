@@ -4,7 +4,10 @@
             "student": {
                 "Attributes": {
                     "id": "int",
-                    "nume": "varchar"
+                    "nume": "varchar",
+                    "v3": "int",
+                    "v4": "int",
+                    "ch3": "varchar"
                 },
                 "Keys": {
                     "PK": "id",
@@ -15,11 +18,16 @@
                 "Attributes": {
                     "unu": "int",
                     "doi": "int",
-                    "trei": "varchar"
+                    "trei": "varchar",
+                    "numefk": "varchar",
+                    "intfk": "int"
                 },
                 "Keys": {
                     "PK": "unu",
-                    "FK": {}
+                    "FK": {
+                        "numefk": "(student, nume)",
+                        "intfk": "(student, id)"
+                    }
                 }
             },
             "ttt": {
@@ -70,12 +78,13 @@
         "Indexes": {
             "Unique": {
                 "newindex": "(student, nume)",
-                "composite": "(grade, doi, trei)",
-                "newTable_i2": "(newtable, i2)",
-                "index1": "(t2, trei)"
+                "student_nume": "(student, nume)",
+                "grade_trei": "(grade, trei)"
             },
             "NonUnique": {
-                "index_name5": "(student, nume)"
+                "index_name5": "(student, nume)",
+                "index_nou": "(grade, doi)",
+                "index_nou_nume": "(student, nume)"
             }
         }
     }
