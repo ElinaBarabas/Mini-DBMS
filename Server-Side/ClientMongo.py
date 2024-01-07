@@ -34,15 +34,6 @@ class ClientMongo:
         file_directory += f"\\json\\"
         return file_directory
 
-    def check_database_existence(self, database_file):
-        for current_database_file in self.json_files:
-            if current_database_file == database_file:
-                return True
-        raise Exception(f"There is no database with this name {database_file}")
-
-    def close_mongoDB(self):
-        self.client.close()
-
     def update_mongoDB(self):
         for json_file in self.json_files:
             database_name = json_file.replace('.json', '')
@@ -97,6 +88,109 @@ class ClientMongo:
                 for collection in collections_to_delete:
                     print(f"Table: {collection} will be deleted")
                     database[collection].drop()
+
+    def close_mongoDB(self):
+        self.client.close()
+
+    # checkers functions
+    def check_database_existence(self, database_file):
+        for current_database_file in self.json_files:
+            if current_database_file == database_file:
+                return True
+        raise Exception(f"There is no database with this name {database_file}")
+
+    def check_insert(self, database_name, collection_name, attributes):
+        database_file_name = f"{database_name.lower()}.json"
+
+        if not self.check_database_existence(database_file_name):
+            raise Exception(f"There is no such database: {database_name}")
+
+        file_path = os.path.join(self.json_directory, database_file_name)
+        if not os.path.exists(file_path):
+            raise Exception(f"Database file {file_path} does not exist.")
+
+        with open(file_path, 'r') as json_file:
+            data = json.load(json_file)
+
+        tables = data.get(database_name, {}).get("Tables", {})
+        if collection_name not in tables:
+            raise Exception(f"There is no such table {collection_name}")
+
+        keys = tables[collection_name].get("Keys", {})
+        if "FK" not in keys:
+            return False
+
+        fk = keys["FK"]
+        collection_attributes = []
+
+        for value in fk.values():
+            item = value.strip('()')
+            collection_attributes.extend(item.split(','))
+
+        collection_attributes = [attr.strip() for attr in collection_attributes]
+
+        if not collection_attributes:
+            return True
+
+        attribute_name = list(fk.keys())[0]
+        position = self.get_attribute_position(database_name, collection_name, attribute_name)
+        if position == -1:
+            return False
+
+        value_check = attributes.split("#")[position - 2]
+        database = self.client[database_name.lower()]
+        collection_list = database.list_collection_names()
+
+        if collection_attributes[0] in collection_list:
+            collection = database[collection_attributes[0]]
+
+            try:  # convert the _id into an integer(if it was given as integer) or let it string
+                value_check = int(value_check)
+            except ValueError:
+                value_check = value_check
+            existing_document = collection.find_one({"_id": value_check})
+
+            if existing_document is not None:
+                return True
+
+        raise Exception("Foreign Keys Constraints are not respected!")
+
+    def check_delete_entry_fk_constraint(self, database_name, collection_name, entity_id):
+
+        database = self.client[database_name]
+        parent_collection = database[collection_name]
+        collections = database.list_collection_names()
+        fk_collection_suffix = f"from_{collection_name}_INDEX"
+
+        entry_to_be_deleted = parent_collection.find_one({"_id": entity_id})
+        can_be_deleted = True
+        if entry_to_be_deleted:
+
+            for collection in collections:
+                if collection.endswith(fk_collection_suffix):
+                    mongo_collection = database[collection]
+                    fk_entry = mongo_collection.find_one({"_id": entity_id})
+                    if fk_entry is not None:
+                        can_be_deleted = False
+                        break
+
+            if not can_be_deleted:
+                raise Exception(f"The element with id {entity_id} cannot be deleted to the FK constrains!")
+            else:
+                print(f"The element with id {entity_id} can be deleted successfully")
+
+    def check_drop_table(self, database_name, collection_name):
+
+        database = self.client[database_name]
+        collections = database.list_collection_names()
+        fk_collection_prefix = f"{collection_name}_INDEX"
+
+        for collection in collections:
+            if collection.endswith(fk_collection_prefix):
+                return False
+        return True
+
+    # getters functions
 
     def get_indexes_from_json(self, database_name, collection_name):
         database_file_name = f"{database_name.lower()}.json"
@@ -168,61 +262,136 @@ class ClientMongo:
                             return position
         return position
 
-    def check_insert(self, database_name, collection_name, attributes):
+    def get_index_names_for_column(self, database_name, collection_name, attribute_name):
+
+        unique_indexes, non_unique_indexes = self.get_indexes_from_json(database_name, collection_name)
+        unique_index_names = []
+        non_unique_index_names = []
+
+        for unique_index in unique_indexes.items():
+            index_name = unique_index[0]
+            index_collections = unique_index[1]
+
+            if attribute_name in index_collections:
+                unique_index_names.append(index_name)
+
+        for non_unique_index in non_unique_indexes.items():
+            index_name = non_unique_index[0]
+            index_collections = non_unique_index[1]
+
+            if attribute_name in index_collections:
+                non_unique_index_names.append(index_name)
+
+        return unique_index_names, non_unique_index_names
+
+    def get_attributes_list(self, database_name, collection_name):
         database_file_name = f"{database_name.lower()}.json"
+        existing_attributes = []
+        if self.check_database_existence(database_file_name):
+            file_path = os.path.join(self.json_directory, database_file_name)
 
-        if not self.check_database_existence(database_file_name):
-            raise Exception(f"There is no such database: {database_name}")
+            with open(file_path, 'r') as json_file:
+                json_data = json.load(json_file)
 
+                if database_name in json_data:
+                    collections = json_data[database_name]['Tables']
+                if collection_name in collections:
+                    attributes = collections[collection_name]['Attributes']
+                    for attribute in attributes.keys():
+                        existing_attributes.append(attribute)
+        return existing_attributes
+
+    # CRUD
+
+    def insert_old_entries_index(self, database_name, collection_name, index_value, index_table_name, index_type):
+
+        database = self.client[database_name]
+        collection = database[collection_name]
+        index_collection = database[index_table_name]
+
+        database_file_name = f"{database_name.lower()}.json"
         file_path = os.path.join(self.json_directory, database_file_name)
-        if not os.path.exists(file_path):
-            raise Exception(f"Database file {file_path} does not exist.")
 
         with open(file_path, 'r') as json_file:
-            data = json.load(json_file)
+            json_data = json.load(json_file)
 
-        tables = data.get(database_name, {}).get("Tables", {})
-        if collection_name not in tables:
-            raise Exception(f"There is no such table {collection_name}")
+            index_column = ''
 
-        keys = tables[collection_name].get("Keys", {})
-        if "FK" not in keys:
-            return False
+            for database in json_data.values():
+                for index_key, index_pair in database['Indexes'][index_type].items():
+                    if index_key == index_value:
+                        index_column = index_pair.strip("()").split(',')[1].strip()
 
-        fk = keys["FK"]
-        collection_attributes = []
+            if index_column != '':
 
-        for value in fk.values():
-            item = value.strip('()')
-            collection_attributes.extend(item.split(','))
+                ok = 0
+                cursor = collection.find({})
+                pk = self.get_primary_key(database_name, collection_name)
 
-        collection_attributes = [attr.strip() for attr in collection_attributes]
+                if pk == index_column:
+                    position = 0
+                else:
+                    position = self.get_attribute_position(database_name, collection_name, index_column)
 
-        if not collection_attributes:
-            return True
+                for document in cursor:
+                    ok = 1
+                    entry_id = document.get("_id")
+                    entry_value = document.get("Value")
 
-        attribute_name = list(fk.keys())[0]
-        position = self.get_attribute_position(database_name, collection_name, attribute_name)
-        if position == -1:
-            return False
+                    if position == 0:
+                        entry_id_to_be_inserted = entry_id
+                        entry_value_to_be_inserted = entry_value
+                    else:
+                        entry_value = str(entry_value)
+                        entry_id_to_be_inserted = entry_value.split('#')[position - 2]
+                        entry_value_to_be_inserted = str(entry_id)
 
-        value_check = attributes.split("#")[position - 2]
-        database = self.client[database_name.lower()]
-        collection_list = database.list_collection_names()
+                        try:
+                            entry_id_to_be_inserted = int(entry_id_to_be_inserted)
+                        except ValueError:
+                            entry_id_to_be_inserted = entry_id_to_be_inserted
 
-        if collection_attributes[0] in collection_list:
-            collection = database[collection_attributes[0]]
+                    if index_type == "NonUnique":
+                        index_document = index_collection.find_one({"_id": entry_id_to_be_inserted})
 
-            try:  # convert the _id into an integer(if it was given as integer) or let it string
-                value_check = int(value_check)
-            except ValueError:
-                value_check = value_check
-            existing_document = collection.find_one({"_id": value_check})
+                        if index_document is None:
+                            data_index = {
+                                "_id": entry_id_to_be_inserted,
+                                "Value": entry_value_to_be_inserted
+                            }
+                            index_collection.insert_one(data_index)
+                            print(
+                                f"Data inserted _id {entry_id_to_be_inserted} for NON-UNIQUE INDEX: {entry_id_to_be_inserted}")
+                        else:
 
-            if existing_document is not None:
-                return True
+                            old_value = str(index_document["Value"])
+                            old_values_list = old_value.split('#')
+                            if entry_value_to_be_inserted not in old_values_list:
 
-        raise Exception("Foreign Keys Constraints are not respected!")
+                                if old_value.endswith('#'):
+                                    new_value = old_value + f"{entry_value_to_be_inserted}"
+                                else:
+                                    new_value = old_value + f"#{entry_value_to_be_inserted}"
+                                index_collection.update_one({'_id': entry_id_to_be_inserted},
+                                                            {'$set': {'Value': new_value}})
+                                print(
+                                    f"Data inserted with {entry_id_to_be_inserted} for NON-UNIQUE INDEX: {entry_id_to_be_inserted}")
+
+                        # handle Unique Indexes
+                    if index_type == "Unique":
+
+                        index_document = index_collection.find_one({"_id": entry_id_to_be_inserted})
+                        if index_document is None:
+                            data_index = {
+                                "_id": entry_id_to_be_inserted,
+                                "Value": entry_value_to_be_inserted
+                            }
+                            index_collection.insert_one(data_index)
+                            print(f"Data inserted with _id {entry_id_to_be_inserted} for UNIQUE INDEX")
+                        else:
+                            print(f"Data with _id {entry_id_to_be_inserted} for UNIQUE INDEX already exists.")
+                if ok == 0:
+                    print(f"No old entries to copy into {index_table_name}")
 
     def insert_data_mongoDB(self, entity_id, attributes, database_name, collection_name):
         database = self.client[database_name]
@@ -436,41 +605,6 @@ class ClientMongo:
         else:
             raise Exception(f"No document found with _id '{entity_id}' in the FK file.")
 
-    def check_delete_entry_fk_constraint(self, database_name, collection_name, entity_id):
-
-        database = self.client[database_name]
-        parent_collection = database[collection_name]
-        collections = database.list_collection_names()
-        fk_collection_suffix = f"from_{collection_name}_INDEX"
-
-        entry_to_be_deleted = parent_collection.find_one({"_id": entity_id})
-        can_be_deleted = True
-        if entry_to_be_deleted:
-
-            for collection in collections:
-                if collection.endswith(fk_collection_suffix):
-                    mongo_collection = database[collection]
-                    fk_entry = mongo_collection.find_one({"_id": entity_id})
-                    if fk_entry is not None:
-                        can_be_deleted = False
-                        break
-
-            if not can_be_deleted:
-                raise Exception(f"The element with id {entity_id} cannot be deleted to the FK constrains!")
-            else:
-                print(f"The element with id {entity_id} can be deleted successfully")
-
-    def check_drop_table(self, database_name, collection_name):
-
-        database = self.client[database_name]
-        collections = database.list_collection_names()
-        fk_collection_prefix = f"{collection_name}_INDEX"
-
-        for collection in collections:
-            if collection.endswith(fk_collection_prefix):
-                return False
-        return True
-
     def drop_table_mongoDB(self, database_name, collection_name):
 
         if not self.check_drop_table(database_name, collection_name):
@@ -484,6 +618,54 @@ class ClientMongo:
                 if collection.startswith(collection_name) or fk_substring in collection:
                     database.drop_collection(collection)
             return True
+
+    # JOINS
+
+    def join(self, commands, database_name):  # select * from ttt join student on ttt.numefk=student.nume in test1
+        commands = commands.split()
+
+        join_keyword_index = commands.index("join")
+        first_collection_name = commands[join_keyword_index - 1]
+        second_collection_name = commands[join_keyword_index + 1]
+
+        database = self.client[database_name]
+        collections_list = database.list_collection_names()
+
+        if first_collection_name not in collections_list or second_collection_name not in collections_list:
+            raise Exception(
+                f"Both tables {first_collection_name, second_collection_name} must exist in the database {database_name}!")
+
+        join_columns = ''
+        for command in commands:
+            if "=" in command:
+                join_columns = command
+
+        if not join_columns:
+            raise Exception("No condition for join!")
+
+        join_columns = join_columns.split("=")
+        left_hand_side = join_columns[0]
+        right_hand_side = join_columns[1]
+
+        left_collection_name, left_collection_attribute = left_hand_side.split('.')
+        right_collection_name, right_collection_attribute = right_hand_side.split('.')
+
+        if left_collection_name == first_collection_name and right_collection_name == second_collection_name:
+            left_existing_attributes = self.get_attributes_list(database_name, left_collection_name)
+            right_existing_attributes = self.get_attributes_list(database_name, right_collection_name)
+
+            if left_collection_attribute not in left_existing_attributes:
+                raise Exception(
+                    f"The join column {left_collection_attribute} does not exist in the {left_collection_name} ")
+
+            if right_collection_attribute not in right_existing_attributes:
+                raise Exception(
+                    f"The join column {right_collection_attribute} does not exist in the {right_collection_name} ")
+
+            print("The join conditions are correct!")
+        raise Exception(f"The join tables are not the same")
+
+    # SELECTION AND PROJECTION
 
     def select_data_mongoDB(self, commands, database_name, collection_name):
 
@@ -691,28 +873,6 @@ class ClientMongo:
 
             return resulted_entries
 
-    def get_index_names_for_column(self, database_name, collection_name, attribute_name):
-
-        unique_indexes, non_unique_indexes = self.get_indexes_from_json(database_name, collection_name)
-        unique_index_names = []
-        non_unique_index_names = []
-
-        for unique_index in unique_indexes.items():
-            index_name = unique_index[0]
-            index_collections = unique_index[1]
-
-            if attribute_name in index_collections:
-                unique_index_names.append(index_name)
-
-        for non_unique_index in non_unique_indexes.items():
-            index_name = non_unique_index[0]
-            index_collections = non_unique_index[1]
-
-            if attribute_name in index_collections:
-                non_unique_index_names.append(index_name)
-
-        return unique_index_names, non_unique_index_names
-
     def parse_attributes(self, database_name, collection_name, column_list):
 
         pk_key = self.get_primary_key(database_name, collection_name)
@@ -750,154 +910,3 @@ class ClientMongo:
             final += f"\n{', '.join(map(str, entry_values))}"
 
         return final
-
-    def get_attributes_list(self, database_name, collection_name):
-        database_file_name = f"{database_name.lower()}.json"
-        existing_attributes = []
-        if self.check_database_existence(database_file_name):
-            file_path = os.path.join(self.json_directory, database_file_name)
-
-            with open(file_path, 'r') as json_file:
-                json_data = json.load(json_file)
-
-                if database_name in json_data:
-                    collections = json_data[database_name]['Tables']
-                if collection_name in collections:
-                    attributes = collections[collection_name]['Attributes']
-                    for attribute in attributes.keys():
-                        existing_attributes.append(attribute)
-        return existing_attributes
-
-    def join(self, commands, database_name):  # select * from ttt join student on ttt.numefk=student.nume in test1
-        commands = commands.split()
-
-        join_keyword_index = commands.index("join")
-        first_collection_name = commands[join_keyword_index - 1]
-        second_collection_name = commands[join_keyword_index + 1]
-
-        database = self.client[database_name]
-        collections_list = database.list_collection_names()
-
-        if first_collection_name not in collections_list or second_collection_name not in collections_list:
-            raise Exception(
-                f"Both tables {first_collection_name, second_collection_name} must exist in the database {database_name}!")
-
-        join_columns = ''
-        for command in commands:
-            if "=" in command:
-                join_columns = command
-
-        if not join_columns:
-            raise Exception("No condition for join!")
-
-        join_columns = join_columns.split("=")
-        left_hand_side = join_columns[0]
-        right_hand_side = join_columns[1]
-
-        left_collection_name, left_collection_attribute = left_hand_side.split('.')
-        right_collection_name, right_collection_attribute = right_hand_side.split('.')
-
-        if left_collection_name == first_collection_name and right_collection_name == second_collection_name:
-            left_existing_attributes = self.get_attributes_list(database_name, left_collection_name)
-            right_existing_attributes = self.get_attributes_list(database_name, right_collection_name)
-
-            if left_collection_attribute not in left_existing_attributes:
-                raise Exception(
-                    f"The join column {left_collection_attribute} does not exist in the {left_collection_name} ")
-
-            if right_collection_attribute not in right_existing_attributes:
-                raise Exception(
-                    f"The join column {right_collection_attribute} does not exist in the {right_collection_name} ")
-
-            print("The join conditions are correct!")
-        raise Exception(f"The join tables are not the same")
-
-    def insert_old_entries_index(self, database_name, collection_name, index_value, index_table_name, index_type):
-
-        database = self.client[database_name]
-        collection = database[collection_name]
-        index_collection = database[index_table_name]
-
-        database_file_name = f"{database_name.lower()}.json"
-        file_path = os.path.join(self.json_directory, database_file_name)
-
-        with open(file_path, 'r') as json_file:
-            json_data = json.load(json_file)
-
-            index_column = ''
-
-            for database in json_data.values():
-                for index_key, index_pair in database['Indexes'][index_type].items():
-                    if index_key == index_value:
-                        index_column = index_pair.strip("()").split(',')[1].strip()
-
-            if index_column != '':
-
-                ok = 0
-                cursor = collection.find({})
-                pk = self.get_primary_key(database_name, collection_name)
-
-                if pk == index_column:
-                    position = 0
-                else:
-                    position = self.get_attribute_position(database_name, collection_name, index_column)
-
-                for document in cursor:
-                    ok = 1
-                    entry_id = document.get("_id")
-                    entry_value = document.get("Value")
-
-                    if position == 0:
-                        entry_id_to_be_inserted = entry_id
-                        entry_value_to_be_inserted = entry_value
-                    else:
-                        entry_value = str(entry_value)
-                        entry_id_to_be_inserted = entry_value.split('#')[position - 2]
-                        entry_value_to_be_inserted = str(entry_id)
-
-                        try:
-                            entry_id_to_be_inserted = int(entry_id_to_be_inserted)
-                        except ValueError:
-                            entry_id_to_be_inserted = entry_id_to_be_inserted
-
-                    if index_type == "NonUnique":
-                        index_document = index_collection.find_one({"_id": entry_id_to_be_inserted})
-
-                        if index_document is None:
-                            data_index = {
-                                "_id": entry_id_to_be_inserted,
-                                "Value": entry_value_to_be_inserted
-                            }
-                            index_collection.insert_one(data_index)
-                            print(
-                                f"Data inserted _id {entry_id_to_be_inserted} for NON-UNIQUE INDEX: {entry_id_to_be_inserted}")
-                        else:
-
-                            old_value = str(index_document["Value"])
-                            old_values_list = old_value.split('#')
-                            if entry_value_to_be_inserted not in old_values_list:
-
-                                if old_value.endswith('#'):
-                                    new_value = old_value + f"{entry_value_to_be_inserted}"
-                                else:
-                                    new_value = old_value + f"#{entry_value_to_be_inserted}"
-                                index_collection.update_one({'_id': entry_id_to_be_inserted},
-                                                            {'$set': {'Value': new_value}})
-                                print(
-                                    f"Data inserted with {entry_id_to_be_inserted} for NON-UNIQUE INDEX: {entry_id_to_be_inserted}")
-
-                        # handle Unique Indexes
-                    if index_type == "Unique":
-
-                        index_document = index_collection.find_one({"_id": entry_id_to_be_inserted})
-                        if index_document is None:
-                            data_index = {
-                                "_id": entry_id_to_be_inserted,
-                                "Value": entry_value_to_be_inserted
-                            }
-                            index_collection.insert_one(data_index)
-                            print(f"Data inserted with _id {entry_id_to_be_inserted} for UNIQUE INDEX")
-                        else:
-                            print(f"Data with _id {entry_id_to_be_inserted} for UNIQUE INDEX already exists.")
-                if ok == 0:
-                    print(f"No old entries to copy into {index_table_name}")

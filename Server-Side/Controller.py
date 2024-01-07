@@ -111,7 +111,6 @@ class Controller:
                     if table_column.strip() != pk_name:
                         raise Exception("The FK must be the primary key of the parent table")
 
-
                 fields_map[attribute_pair[2]] = attribute_pair[1]
 
                 fk_builder = {"fk_name": fk_value, "table": table_name, "column": table_column}
