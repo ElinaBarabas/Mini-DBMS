@@ -4,10 +4,7 @@
             "student": {
                 "Attributes": {
                     "id": "int",
-                    "nume": "varchar",
-                    "v3": "int",
-                    "v4": "int",
-                    "ch3": "varchar"
+                    "name": "varchar"
                 },
                 "Keys": {
                     "PK": "id",

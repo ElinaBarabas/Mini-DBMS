@@ -4,48 +4,32 @@
             "student": {
                 "Attributes": {
                     "id": "int",
-                    "cop": "varchar"
+                    "name": "varchar"
                 },
                 "Keys": {
                     "PK": "id",
                     "FK": {}
                 }
             },
-            "group": {
+            "assignment": {
                 "Attributes": {
-                    "unu": "int",
-                    "doi": "int",
-                    "3": "varchar",
-                    "numefk": "int"
+                    "id": "int",
+                    "grade": "int",
+                    "name": "varchar",
+                    "studentId": "int"
                 },
                 "Keys": {
-                    "PK": "unu",
+                    "PK": "id",
                     "FK": {
-                        "numefk": "(student, id)"
-                    }
-                }
-            },
-            "name": {
-                "Attributes": {
-                    "unu": "int",
-                    "doi": "int",
-                    "3": "varchar",
-                    "numefk": "int",
-                    "k": "varchar"
-                },
-                "Keys": {
-                    "PK": "unu",
-                    "FK": {
-                        "numefk": "(student, id)"
+                        "studentId": "(student, id)"
                     }
                 }
             }
         },
         "Indexes": {
-            "Unique": {
-            },
+            "Unique": {},
             "NonUnique": {
-                "nui": "(name, doi)"
+                "grade_index": "(assignment, grade)"
             }
         }
     }

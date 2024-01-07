@@ -464,10 +464,10 @@ class ClientMongo:
 
         database = self.client[database_name]
         collections = database.list_collection_names()
-        fk_collection_prefix = f"{collection_name}_FK"
+        fk_collection_prefix = f"{collection_name}_INDEX"
 
         for collection in collections:
-            if collection.startswith(fk_collection_prefix):
+            if collection.endswith(fk_collection_prefix):
                 return False
         return True
 
@@ -479,7 +479,7 @@ class ClientMongo:
             database = self.client[database_name]
             collections = database.list_collection_names()
 
-            fk_substring = f"for_{collection_name}_INDEX"
+            fk_substring = f"for_{collection_name}_on"
             for collection in collections:
                 if collection.startswith(collection_name) or fk_substring in collection:
                     database.drop_collection(collection)
