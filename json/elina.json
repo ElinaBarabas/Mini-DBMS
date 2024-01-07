@@ -27,9 +27,13 @@
             }
         },
         "Indexes": {
-            "Unique": {},
+            "Unique": {
+                "ui": "(assignment, grade, name)",
+                "uu": "(assignment, name)"
+            },
             "NonUnique": {
-                "grade_index": "(assignment, grade)"
+                "grade_index": "(assignment, grade)",
+                "nui": "(assignment, grade, name)"
             }
         }
     }

@@ -26,7 +26,7 @@ class ClientMongo:
             value2 = value2
 
         if type(value1) != type(value2):
-            raise Exception("Operands must be the same type")
+            return False
 
         if operator == '=':
             return value1 == value2
@@ -34,6 +34,14 @@ class ClientMongo:
             return value1 > value2
         elif operator == '<':
             return value1 < value2
+        elif operator == '!=':
+            return value1 != value2
+        elif operator == '>=':
+            return value1 >= value2
+        elif operator == '<=':
+            return value1 <= value2
+
+
 
     @staticmethod
     def create_collection(database, collection_name):
@@ -334,7 +342,14 @@ class ClientMongo:
             for database in json_data.values():
                 for index_key, index_pair in database['Indexes'][index_type].items():
                     if index_key == index_value:
-                        index_column = index_pair.strip("()").split(',')[1].strip()
+                        index_attributes = index_pair.strip("()").split(',')
+                        if len(index_attributes) == 2:
+                            index_column = index_attributes[1].strip()
+                        else:
+                            composite_index_columns = index_attributes[1:]
+
+                            for i in range(len(composite_index_columns)):
+                                composite_index_columns[i] = composite_index_columns[i].strip()
 
             if index_column != '':
 
@@ -380,7 +395,7 @@ class ClientMongo:
 
                             old_value = str(index_document["Value"])
                             old_values_list = old_value.split('#')
-                            if entry_value_to_be_inserted not in old_values_list:
+                            if str(entry_value_to_be_inserted) not in old_values_list:
 
                                 if old_value.endswith('#'):
                                     new_value = old_value + f"{entry_value_to_be_inserted}"
@@ -403,7 +418,86 @@ class ClientMongo:
                             index_collection.insert_one(data_index)
                             print(f"Data inserted with _id {entry_id_to_be_inserted} for UNIQUE INDEX")
                         else:
-                            print(f"Data with _id {entry_id_to_be_inserted} for UNIQUE INDEX already exists.")
+                            print(f"Data with _id {entry_id_to_be_inserted} for UNIQUE INDEX already exists.\n")
+                if ok == 0:
+                    print(f"No old entries to copy into {index_table_name}")
+                return
+
+            if composite_index_columns != '':
+
+                ok = 0
+                cursor = collection.find({})
+                pk = self.get_primary_key(database_name, collection_name)
+
+
+                for document in cursor:
+                    entry_id_to_be_inserted = ''
+                    entry_value_to_be_inserted = ''
+                    ok = 1
+                    entry_id = document.get("_id")
+                    entry_value = document.get("Value")
+
+                    for composite_index_column in composite_index_columns:
+                        if pk == composite_index_column:
+                            position = 0
+                        else:
+                            position = self.get_attribute_position(database_name, collection_name,
+                                                                   composite_index_column)
+
+                        if position == 0:
+                            entry_id_to_be_inserted += entry_id
+                            entry_id_to_be_inserted += '#'
+                            entry_value_to_be_inserted = entry_value
+                        else:
+                            entry_value = str(entry_value)
+                            entry_id_to_be_inserted += entry_value.split('#')[position - 2]
+                            entry_id_to_be_inserted += '#'
+                            entry_value_to_be_inserted = str(entry_id)
+
+                            try:
+                                entry_id_to_be_inserted = int(entry_id_to_be_inserted)
+                            except ValueError:
+                                entry_id_to_be_inserted = entry_id_to_be_inserted
+
+                    if index_type == "NonUnique":
+                        index_document = index_collection.find_one({"_id": entry_id_to_be_inserted})
+
+                        if index_document is None:
+                            data_index = {
+                                "_id": entry_id_to_be_inserted,
+                                "Value": entry_value_to_be_inserted
+                            }
+                            index_collection.insert_one(data_index)
+                            print(
+                                f"Data inserted _id {entry_id_to_be_inserted} for NON-UNIQUE INDEX: {entry_id_to_be_inserted}")
+                        else:
+
+                            old_value = str(index_document["Value"])
+                            old_values_list = old_value.split('#')
+                            if str(entry_value_to_be_inserted) not in old_values_list:
+
+                                if old_value.endswith('#'):
+                                    new_value = old_value + f"{entry_value_to_be_inserted}"
+                                else:
+                                    new_value = old_value + f"#{entry_value_to_be_inserted}"
+                                index_collection.update_one({'_id': entry_id_to_be_inserted},
+                                                            {'$set': {'Value': new_value}})
+                                print(
+                                    f"Data inserted with {entry_id_to_be_inserted} for NON-UNIQUE INDEX: {entry_id_to_be_inserted}")
+
+                        # handle Unique Indexes
+                    if index_type == "Unique":
+
+                        index_document = index_collection.find_one({"_id": entry_id_to_be_inserted})
+                        if index_document is None:
+                            data_index = {
+                                "_id": entry_id_to_be_inserted,
+                                "Value": entry_value_to_be_inserted
+                            }
+                            index_collection.insert_one(data_index)
+                            print(f"Data inserted with _id {entry_id_to_be_inserted} for UNIQUE INDEX")
+                        else:
+                            print(f"Data with _id {entry_id_to_be_inserted} for UNIQUE INDEX already exists.\n")
                 if ok == 0:
                     print(f"No old entries to copy into {index_table_name}")
 
@@ -430,7 +524,9 @@ class ClientMongo:
                     index_values = [
                         attributes_split[self.get_attribute_position(database_name, collection_name, attr) - 2] for attr
                         in n_index]
-                    index_values_str = "_".join(str(v) for v in index_values)
+                    index_values_str = "#".join(str(v) for v in index_values)
+                    if not index_values_str.endswith('#') and len(index_values_str) > 2:
+                        index_values_str += '#'
                     collection_index_name = f"{collection_name}_NonUnique_{key}_INDEX"
                     collection_index = database[collection_index_name]
 
@@ -451,7 +547,7 @@ class ClientMongo:
                     else:
                         old_value = str(index_document["Value"])
                         old_values_list = old_value.split('#')
-                        if entity_id not in old_values_list:
+                        if str(entity_id) not in old_values_list:
                             if old_value.endswith('#'):
                                 new_value = old_value + f"{entity_id}"
                             else:
@@ -469,7 +565,9 @@ class ClientMongo:
                     index_values = [
                         attributes_split[self.get_attribute_position(database_name, collection_name, attr) - 2] for attr
                         in n_index]
-                    index_values_str = "_".join(str(v) for v in index_values)
+                    index_values_str = "#".join(str(v) for v in index_values)
+                    if not index_values_str.endswith('#') and len(index_values_str) > 2:
+                        index_values_str += '#'
                     collection_index_name = f"{collection_name}_Unique_{key}_INDEX"
                     collection_index = database[collection_index_name]
 
@@ -488,7 +586,7 @@ class ClientMongo:
                         collection_index.insert_one(data_index)
                         print(f"Data inserted for UNIQUE INDEX: {entity_id}")
                     else:
-                        response += f"Data with _id {index_values_str} for UNIQUE INDEX already exists."
+                        response += f"Data with _id {index_values_str} for UNIQUE INDEX already exists.\n"
 
             # handle fk values
             fk_map = self.get_foreign_keys(database_name, collection_name)
@@ -523,7 +621,7 @@ class ClientMongo:
 
                         old_value = str(fk_document["Value"])
                         old_values_list = old_value.split('#')
-                        if entity_id not in old_values_list:
+                        if str(entity_id) not in old_values_list:
                             if old_value.endswith('#'):
                                 new_value = old_value + f"{entity_id}"
                             else:
@@ -545,6 +643,7 @@ class ClientMongo:
             }
             collection.insert_one(data)
             print(f"Data with id: {entity_id} inserted in {collection}")
+            response += f"Data with id: {entity_id} inserted in {collection_name}."
             return response
 
     def delete_data_mongoDB(self, entity_id, database_name, collection_name):
@@ -740,8 +839,6 @@ class ClientMongo:
 
     def complex_select_mongoDB(self, commands, database_name, collection_name):
 
-        # TODO DISTINCT
-
         is_select_all = True if "*" in commands else False
         distinct_select = True if "distinct" in commands else False
 
@@ -788,12 +885,18 @@ class ClientMongo:
             if clause == "and":
                 count_clauses += 1
             else:
-                if '=' in clause:
-                    operator = '='
+                if '!=' in clause:
+                    operator = '!='
+                elif '>=' in clause:
+                    operator = '>='
+                elif '<=' in clause:
+                    operator = '<='
                 elif '>' in clause:
                     operator = '>'
                 elif '<' in clause:
                     operator = '<'
+                elif '=' in clause:
+                    operator = '='
                 else:
                     raise Exception("Invalid operator")
 
@@ -870,7 +973,7 @@ class ClientMongo:
 
                                         resulted_entries += current_entry
 
-                if non_unique_index_names:  ## adding  * and projection
+                if non_unique_index_names:
                     for non_unique_index_name in non_unique_index_names:
                         index_file_name = f"{collection_name}_NonUnique_{non_unique_index_name}_INDEX"
                         collection = database[index_file_name]
