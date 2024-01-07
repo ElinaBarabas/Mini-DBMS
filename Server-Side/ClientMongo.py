@@ -14,6 +14,20 @@ class ClientMongo:
 
     @staticmethod
     def check_comparison(value1, value2, operator):
+
+        try:
+            value1 = int(value1)
+        except ValueError:
+            value1 = value1
+
+        try:
+            value2 = int(value2)
+        except ValueError:
+            value2 = value2
+
+        if type(value1) != type(value2):
+            raise Exception("Operands must be the same type")
+
         if operator == '=':
             return value1 == value2
         elif operator == '>':
@@ -689,7 +703,7 @@ class ClientMongo:
 
     def simple_select_mongoDB(self, commands, database_name, collection_name):
 
-        is_select_all = True if commands[1] == "*" else False
+        is_select_all = True if "*" in commands else False
         resulted_entries = ""
 
         database = self.client[database_name]
@@ -725,6 +739,40 @@ class ClientMongo:
         return resulted_entries
 
     def complex_select_mongoDB(self, commands, database_name, collection_name):
+
+        # TODO DISTINCT
+
+        is_select_all = True if "*" in commands else False
+        distinct_select = True if "distinct" in commands else False
+
+        if not is_select_all:
+
+            select_keyword_index = commands.index("select")
+
+            if distinct_select:
+                distinct_keyword_index = commands.index("distinct")
+                column_names = commands[select_keyword_index + 1: distinct_keyword_index][0]
+            else:
+                from_keyword = commands.index("from")
+                column_names = commands[select_keyword_index + 1: from_keyword][0]
+
+            column_names_list = column_names.split(',')
+        else:
+            column_names_list = self.get_attributes_list(database_name, collection_name)
+
+        attribute_position = []
+        pk = self.get_primary_key(database_name, collection_name)
+        attributes_list = self.get_attributes_list(database_name, collection_name)
+        for column_name in column_names_list:
+            column_name = column_name.strip()
+            if column_name not in attributes_list:
+                raise Exception(f"{column_name} is not a valid field in {collection_name}")
+            if column_name == pk:
+                attribute_position.append(-1)
+            else:
+                position = attributes_list.index(column_name)
+                attribute_position.append(position - 1)  # the PK is in the key, not in the value
+
         where_keyword_index = commands.index("where")
         on_keyword = commands.index("on")
 
@@ -781,10 +829,20 @@ class ClientMongo:
                                     new_collection = database[collection_name]
                                     existing_document = new_collection.find_one({"_id": entity_id})
                                     value = str(existing_document.get('Value'))
-                                    value = value.replace("#", ", ")
-                                    value = value[0:-2]
-                                    entry_values = "\n" + str(existing_document.get("_id")) + " " + value
-                                    resulted_entries += entry_values
+                                    value = value.replace("#", ",")
+                                    value = value[0:-1]
+                                    attributes_value_list = value.split(",")
+
+                                    current_entry = "\n"
+                                    for position in attribute_position:
+                                        if position == -1:
+                                            field_value = str(existing_document.get("_id"))
+                                        else:
+                                            field_value = attributes_value_list[position]
+                                        current_entry += field_value
+                                        current_entry += ' '
+
+                                    resulted_entries += current_entry
                                 else:  # multiple entries with the same index value
                                     entity_ids = entity_id
                                     entity_ids_list = entity_ids.split("#")
@@ -797,12 +855,22 @@ class ClientMongo:
                                         new_collection = database[collection_name]
                                         existing_document = new_collection.find_one({"_id": entry})
                                         value = str(existing_document.get('Value'))
-                                        value = value.replace("#", ", ")
-                                        value = value[0:-2]
-                                        entry_values = "\n" + str(existing_document.get("_id")) + " " + value
-                                        resulted_entries += entry_values
+                                        value = value.replace("#", ",")
+                                        value = value[0:-1]
+                                        attributes_value_list = value.split(",")
 
-                if non_unique_index_names:
+                                        current_entry = "\n"
+                                        for position in attribute_position:
+                                            if position == -1:
+                                                field_value = str(existing_document.get("_id"))
+                                            else:
+                                                field_value = attributes_value_list[position]
+                                            current_entry += field_value
+                                            current_entry += ' '
+
+                                        resulted_entries += current_entry
+
+                if non_unique_index_names:  ## adding  * and projection
                     for non_unique_index_name in non_unique_index_names:
                         index_file_name = f"{collection_name}_NonUnique_{non_unique_index_name}_INDEX"
                         collection = database[index_file_name]
@@ -822,27 +890,50 @@ class ClientMongo:
                                     new_collection = database[collection_name]
                                     existing_document = new_collection.find_one({"_id": entity_id})
                                     value = str(existing_document.get('Value'))
-                                    value = value.replace("#", ", ")
-                                    value = value[0:-2]
-                                    entry_values = "\n" + str(existing_document.get("_id")) + " " + value
-                                    resulted_entries += entry_values
+                                    value = value.replace("#", ",")
+                                    value = value[0:-1]
+
+                                    attributes_value_list = value.split(",")
+
+                                    current_entry = "\n"
+                                    for position in attribute_position:
+                                        if position == -1:
+                                            field_value = str(existing_document.get("_id"))
+                                        else:
+                                            field_value = attributes_value_list[position]
+                                        current_entry += field_value
+                                        current_entry += ' '
+
+                                    resulted_entries += current_entry
+
                                 else:  # multiple entries with the same index value
                                     entity_ids = entity_id
-                                    entity_ids_list = entity_ids.split("#")
+                                    entity_ids_list = entity_ids.strip().split("#")
                                     for entry in entity_ids_list:
+                                        if entry != '':
+                                            try:
+                                                entry = int(entry)
+                                            except ValueError:
+                                                entry = entry
 
-                                        try:
-                                            entry = int(entry)
-                                        except ValueError:
-                                            entry = entry
+                                            new_collection = database[collection_name]
+                                            existing_document = new_collection.find_one({"_id": entry})
+                                            value = str(existing_document.get('Value'))
+                                            value = value.replace("#", ",")
+                                            value = value[0:-1]
 
-                                        new_collection = database[collection_name]
-                                        existing_document = new_collection.find_one({"_id": entry})
-                                        value = str(existing_document.get('Value'))
-                                        value = value.replace("#", ", ")
-                                        value = value[0:-2]
-                                        entry_values = "\n" + str(existing_document.get("_id")) + " " + value
-                                        resulted_entries += entry_values
+                                            attributes_value_list = value.split(",")
+
+                                            current_entry = "\n"
+                                            for position in attribute_position:
+                                                if position == -1:
+                                                    field_value = str(existing_document.get("_id"))
+                                                else:
+                                                    field_value = attributes_value_list[position]
+                                                current_entry += field_value
+                                                current_entry += ' '
+
+                                            resulted_entries += current_entry
 
                 if not unique_index_names and not non_unique_index_names:  # there are no indices for the given column
 
@@ -875,10 +966,30 @@ class ClientMongo:
                             result = self.check_comparison(entry_id, attribute_value, operator)
                         if result:
                             value = document.get('Value')
-                            value = value.replace("#", ", ")
-                            value = value[0:-2]
-                            entry_values = "\n" + str(entry_id) + " " + value
-                            resulted_entries += entry_values
+                            value = value.replace("#", ",")
+                            value = value[0:-1]
+                            attributes_value_list = value.split(",")
+
+                            current_entry = "\n"
+
+                            for position in attribute_position:
+                                if position == -1:
+                                    field_value = str(document.get("_id"))
+                                else:
+                                    field_value = attributes_value_list[position]
+                                current_entry += field_value
+                                current_entry += ' '
+
+                            resulted_entries += current_entry
+
+            if distinct_select:  # select grade distinct from assignment on elina
+                values = resulted_entries.strip().split("\n")
+                distinct_result_entries = ''
+                for value in values:
+                    if value not in distinct_result_entries:
+                        distinct_result_entries += '\n'
+                        distinct_result_entries += value
+                return distinct_result_entries
 
             return resulted_entries
 
