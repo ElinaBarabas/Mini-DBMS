@@ -713,6 +713,15 @@ class ClientMongo:
 
             resulted_entries = self.parse_attributes(database_name, collection_name, column_names_list)
 
+        if "distinct" in commands:  # select grade distinct from assignment on elina
+            values = resulted_entries.strip().split("\n")
+            distinct_result_entries = ''
+            for value in values:
+                if value not in distinct_result_entries:
+                    distinct_result_entries += '\n'
+                    distinct_result_entries += value
+            return distinct_result_entries
+
         return resulted_entries
 
     def complex_select_mongoDB(self, commands, database_name, collection_name):
