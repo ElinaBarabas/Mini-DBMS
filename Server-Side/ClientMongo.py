@@ -41,8 +41,6 @@ class ClientMongo:
         elif operator == '<=':
             return value1 <= value2
 
-
-
     @staticmethod
     def create_collection(database, collection_name):
         if collection_name not in database.list_collection_names():
@@ -264,6 +262,25 @@ class ClientMongo:
                 for database in json_data.values():
                     return database["Tables"][collection_name]["Keys"]["PK"]
 
+    def get_attribute_position_composite_index(self, database_name, attribute_name, index_type,
+                                               index_name):  # if it is a composite index, we must several appended attributes as key
+        is_composite = False
+        database_file_name = f"{database_name.lower()}.json"
+
+        file_path = os.path.join(self.json_directory, database_file_name)
+        with open(file_path, 'r') as json_file:
+            json_data = json.load(json_file)
+
+            all_indexes = json_data.get(database_name, {}).get("Indexes", {})
+            required_indexes = dict(all_indexes[index_type])
+            index_info_tuple = required_indexes[index_name]
+            attributes = tuple(map(str.strip, index_info_tuple.strip('()').split(',')))
+            index = attributes.index(attribute_name)
+
+            if len(attributes) > 2:
+                is_composite = True
+            return index - 1, is_composite  # first position id for the table name
+
     def get_attribute_position(self, database_name, collection_name, attribute_name):
         attribute_name = attribute_name.replace(" ", "")
         database_file_name = f"{database_name.lower()}.json"
@@ -428,7 +445,6 @@ class ClientMongo:
                 ok = 0
                 cursor = collection.find({})
                 pk = self.get_primary_key(database_name, collection_name)
-
 
                 for document in cursor:
                     entry_id_to_be_inserted = ''
@@ -912,51 +928,113 @@ class ClientMongo:
                 unique_index_names, non_unique_index_names = self.get_index_names_for_column(database_name,
                                                                                              collection_name,
                                                                                              attribute_name)
+                index = True
+                if non_unique_index_names:
+                    for non_unique_index_name in non_unique_index_names:
+                        if index is True:
+                            index_file_name = f"{collection_name}_NonUnique_{non_unique_index_name}_INDEX"
+                            collection = database[index_file_name]
+                            cursor = collection.find({})
+                            for document in cursor:
+                                entry_id = document.get("_id")
 
-                if unique_index_names:
-                    for unique_index_name in unique_index_names:
-                        index_file_name = f"{collection_name}_Unique_{unique_index_name}_INDEX"
-                        collection = database[index_file_name]
-                        cursor = collection.find({})
-                        for document in cursor:
-                            entry_id = document.get("_id")
-                            result = self.check_comparison(entry_id, attribute_value, operator)
-                            if result:
-                                entity_id = document.get('Value')
+                                attribute_position_in_key, is_composite = self.get_attribute_position_composite_index(
+                                    database_name, attribute_name, "NonUnique", non_unique_index_name)
 
-                                if "#" not in str(entity_id):  # one entry as value
-                                    try:
-                                        entity_id = int(entity_id)
-                                    except ValueError:
-                                        entity_id = entity_id
-                                    new_collection = database[collection_name]
-                                    existing_document = new_collection.find_one({"_id": entity_id})
-                                    value = str(existing_document.get('Value'))
-                                    value = value.replace("#", ",")
-                                    value = value[0:-1]
-                                    attributes_value_list = value.split(",")
+                                if is_composite:
+                                    key_elements = entry_id.split('#')
+                                    current_entry_id = key_elements[attribute_position_in_key]
+                                else:
+                                    current_entry_id = entry_id
 
-                                    current_entry = "\n"
-                                    for position in attribute_position:
-                                        if position == -1:
-                                            field_value = str(existing_document.get("_id"))
-                                        else:
-                                            field_value = attributes_value_list[position]
-                                        current_entry += field_value
-                                        current_entry += ' '
+                                result = self.check_comparison(current_entry_id, attribute_value, operator)
+                                if result:
+                                    entity_id = document.get('Value')
 
-                                    resulted_entries += current_entry
-                                else:  # multiple entries with the same index value
-                                    entity_ids = entity_id
-                                    entity_ids_list = entity_ids.split("#")
-                                    for entry in entity_ids_list:
-
+                                    if "#" not in str(entity_id):  # one entry as value
                                         try:
-                                            entry = int(entry)
+                                            entity_id = int(entity_id)
                                         except ValueError:
-                                            entry = entry
+                                            entity_id = entity_id
+
                                         new_collection = database[collection_name]
-                                        existing_document = new_collection.find_one({"_id": entry})
+                                        existing_document = new_collection.find_one({"_id": entity_id})
+                                        value = str(existing_document.get('Value'))
+                                        value = value.replace("#", ",")
+                                        value = value[0:-1]
+
+                                        attributes_value_list = value.split(",")
+
+                                        current_entry = "\n"
+                                        for position in attribute_position:
+                                            if position == -1:
+                                                field_value = str(existing_document.get("_id"))
+                                            else:
+                                                field_value = attributes_value_list[position]
+                                            current_entry += field_value
+                                            current_entry += ' '
+
+                                        resulted_entries += current_entry
+
+                                    else:  # multiple entries with the same index value
+                                        entity_ids = entity_id
+                                        entity_ids_list = entity_ids.strip().split("#")
+                                        for entry in entity_ids_list:
+                                            if entry != '':
+                                                try:
+                                                    entry = int(entry)
+                                                except ValueError:
+                                                    entry = entry
+
+                                                new_collection = database[collection_name]
+                                                existing_document = new_collection.find_one({"_id": entry})
+                                                value = str(existing_document.get('Value'))
+                                                value = value.replace("#", ",")
+                                                value = value[0:-1]
+
+                                                attributes_value_list = value.split(",")
+
+                                                current_entry = "\n"
+                                                for position in attribute_position:
+                                                    if position == -1:
+                                                        field_value = str(existing_document.get("_id"))
+                                                    else:
+                                                        field_value = attributes_value_list[position]
+                                                    current_entry += field_value
+                                                    current_entry += ' '
+
+                                                resulted_entries += current_entry
+                        index = False
+
+                elif unique_index_names:
+                    for unique_index_name in unique_index_names:
+                        if index is True:
+                            index_file_name = f"{collection_name}_Unique_{unique_index_name}_INDEX"
+                            collection = database[index_file_name]
+                            cursor = collection.find({})
+                            for document in cursor:
+                                entry_id = document.get("_id")
+
+                                attribute_position_in_key, is_composite = self.get_attribute_position_composite_index(
+                                    database_name, attribute_name,"Unique", unique_index_name)
+
+                                if is_composite:
+                                    key_elements = entry_id.split('#')
+                                    current_entry_id = key_elements[attribute_position_in_key]
+                                else:
+                                    current_entry_id = entry_id
+
+                                result = self.check_comparison(current_entry_id, attribute_value, operator)
+                                if result:
+                                    entity_id = document.get('Value')
+
+                                    if "#" not in str(entity_id):  # one entry as value
+                                        try:
+                                            entity_id = int(entity_id)
+                                        except ValueError:
+                                            entity_id = entity_id
+                                        new_collection = database[collection_name]
+                                        existing_document = new_collection.find_one({"_id": entity_id})
                                         value = str(existing_document.get('Value'))
                                         value = value.replace("#", ",")
                                         value = value[0:-1]
@@ -972,59 +1050,20 @@ class ClientMongo:
                                             current_entry += ' '
 
                                         resulted_entries += current_entry
+                                    else:  # multiple entries with the same index value
+                                        entity_ids = entity_id
+                                        entity_ids_list = entity_ids.split("#")
+                                        for entry in entity_ids_list:
 
-                if non_unique_index_names:
-                    for non_unique_index_name in non_unique_index_names:
-                        index_file_name = f"{collection_name}_NonUnique_{non_unique_index_name}_INDEX"
-                        collection = database[index_file_name]
-                        cursor = collection.find({})  # change to find_one
-                        for document in cursor:
-                            entry_id = document.get("_id")
-                            result = self.check_comparison(entry_id, attribute_value, operator)
-                            if result:
-                                entity_id = document.get('Value')
-
-                                if "#" not in str(entity_id):  # one entry as value
-                                    try:
-                                        entity_id = int(entity_id)
-                                    except ValueError:
-                                        entity_id = entity_id
-
-                                    new_collection = database[collection_name]
-                                    existing_document = new_collection.find_one({"_id": entity_id})
-                                    value = str(existing_document.get('Value'))
-                                    value = value.replace("#", ",")
-                                    value = value[0:-1]
-
-                                    attributes_value_list = value.split(",")
-
-                                    current_entry = "\n"
-                                    for position in attribute_position:
-                                        if position == -1:
-                                            field_value = str(existing_document.get("_id"))
-                                        else:
-                                            field_value = attributes_value_list[position]
-                                        current_entry += field_value
-                                        current_entry += ' '
-
-                                    resulted_entries += current_entry
-
-                                else:  # multiple entries with the same index value
-                                    entity_ids = entity_id
-                                    entity_ids_list = entity_ids.strip().split("#")
-                                    for entry in entity_ids_list:
-                                        if entry != '':
                                             try:
                                                 entry = int(entry)
                                             except ValueError:
                                                 entry = entry
-
                                             new_collection = database[collection_name]
                                             existing_document = new_collection.find_one({"_id": entry})
                                             value = str(existing_document.get('Value'))
                                             value = value.replace("#", ",")
                                             value = value[0:-1]
-
                                             attributes_value_list = value.split(",")
 
                                             current_entry = "\n"
@@ -1037,8 +1076,9 @@ class ClientMongo:
                                                 current_entry += ' '
 
                                             resulted_entries += current_entry
+                            index = False
 
-                if not unique_index_names and not non_unique_index_names:  # there are no indices for the given column
+                else:  # there are no indices for the given column
 
                     collection = database[collection_name]
                     cursor = collection.find({})

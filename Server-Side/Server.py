@@ -7,7 +7,7 @@ def server_program():
     try:
 
         host = socket.gethostname()
-        port = 5236
+        port = 5235
         server_socket = socket.socket()
         server_socket.bind((host, port))
         server_socket.listen(2)
