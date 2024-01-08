@@ -748,52 +748,6 @@ class ClientMongo:
                     database.drop_collection(collection)
             return True
 
-    # JOINS
-
-    def join(self, commands, database_name):  # select * from ttt join student on ttt.numefk=student.nume in test1
-        commands = commands.split()
-
-        join_keyword_index = commands.index("join")
-        first_collection_name = commands[join_keyword_index - 1]
-        second_collection_name = commands[join_keyword_index + 1]
-
-        database = self.client[database_name]
-        collections_list = database.list_collection_names()
-
-        if first_collection_name not in collections_list or second_collection_name not in collections_list:
-            raise Exception(
-                f"Both tables {first_collection_name, second_collection_name} must exist in the database {database_name}!")
-
-        join_columns = ''
-        for command in commands:
-            if "=" in command:
-                join_columns = command
-
-        if not join_columns:
-            raise Exception("No condition for join!")
-
-        join_columns = join_columns.split("=")
-        left_hand_side = join_columns[0]
-        right_hand_side = join_columns[1]
-
-        left_collection_name, left_collection_attribute = left_hand_side.split('.')
-        right_collection_name, right_collection_attribute = right_hand_side.split('.')
-
-        if left_collection_name == first_collection_name and right_collection_name == second_collection_name:
-            left_existing_attributes = self.get_attributes_list(database_name, left_collection_name)
-            right_existing_attributes = self.get_attributes_list(database_name, right_collection_name)
-
-            if left_collection_attribute not in left_existing_attributes:
-                raise Exception(
-                    f"The join column {left_collection_attribute} does not exist in the {left_collection_name} ")
-
-            if right_collection_attribute not in right_existing_attributes:
-                raise Exception(
-                    f"The join column {right_collection_attribute} does not exist in the {right_collection_name} ")
-
-            print("The join conditions are correct!")
-        raise Exception(f"The join tables are not the same")
-
     # SELECTION AND PROJECTION
 
     def select_data_mongoDB(self, commands, database_name, collection_name):
@@ -896,7 +850,7 @@ class ClientMongo:
         count_clauses = 1
 
         existing_attributes = self.get_attributes_list(database_name, collection_name)
-        matching_entries_id = []            # list of indices that respects the current_clause
+        matching_entries_id = []  # list of indices that respects the current_clause
 
         for clause in where_clause:
             if clause == "and":
@@ -1136,7 +1090,6 @@ class ClientMongo:
                 else:  # where i=1 AND j=2
 
                     matching_entries_id = list(set(matching_entries_id))
-                    new_matching_entries = []
                     resulted_entries = ''
                     if not matching_entries_id:
                         break
@@ -1149,7 +1102,8 @@ class ClientMongo:
                                 document = collection.find_one({"_id": matching_id})
 
                                 if attribute_name != pk_key:
-                                    position = self.get_attribute_position(database_name, collection_name, attribute_name)
+                                    position = self.get_attribute_position(database_name, collection_name,
+                                                                           attribute_name)
 
                                     entry_value = document.get('Value')
 
@@ -1240,3 +1194,82 @@ class ClientMongo:
             final += f"\n{', '.join(map(str, entry_values))}"
 
         return final
+
+        # JOINS
+
+    def join(self, commands, database_name):  # select * from ttt join student on ttt.numefk=student.nume in test1
+        commands = commands.split()
+
+        join_keyword_indexes = []
+        equal_operator_indexes = []
+
+        for i in range(len(commands)):
+            if commands[i] == "join":
+                join_keyword_indexes.append(i)
+            elif "=" in commands[i]:
+                equal_operator_indexes.append(i)
+
+        if len(join_keyword_indexes) != len(equal_operator_indexes):
+            raise Exception("The number of joins and joins conditions should be the same")
+
+        first_join = True
+        for i in range(len(join_keyword_indexes)):
+
+            join_keyword_index = join_keyword_indexes[i]
+
+            if first_join:
+
+                first_collection_name = commands[join_keyword_index - 1]
+                second_collection_name = commands[join_keyword_index + 1]
+
+                database = self.client[database_name]
+                collections_list = database.list_collection_names()
+
+                if first_collection_name not in collections_list or second_collection_name not in collections_list:
+                    raise Exception(
+                        f"Both tables {first_collection_name, second_collection_name} must exist in the database {database_name}!")
+
+                current_equal_index = equal_operator_indexes[i]
+                join_columns = commands[current_equal_index]
+                join_columns = join_columns.split("=")
+                left_hand_side = join_columns[0]
+                right_hand_side = join_columns[1]
+
+                left_collection_name, left_collection_attribute = left_hand_side.split('.')
+                right_collection_name, right_collection_attribute = right_hand_side.split('.')
+
+                if ((
+                        left_collection_name == first_collection_name or left_collection_name == second_collection_name) and
+                        (
+                                right_collection_name == first_collection_name or right_collection_name == second_collection_name)):
+                    left_existing_attributes = self.get_attributes_list(database_name, left_collection_name)
+                    right_existing_attributes = self.get_attributes_list(database_name, right_collection_name)
+
+                    if left_collection_attribute not in left_existing_attributes:
+                        raise Exception(
+                            f"The join column {left_collection_attribute} does not exist in the {left_collection_name} ")
+
+                    if right_collection_attribute not in right_existing_attributes:
+                        raise Exception(
+                            f"The join column {right_collection_attribute} does not exist in the {right_collection_name} ")
+
+                    first_join = False
+                    print("The join conditions are correct!")
+                else:
+                    raise Exception(f"The join tables are not the same")
+
+            else:
+
+                current_equal_index = equal_operator_indexes[i]
+                join_columns = commands[current_equal_index]
+                join_columns = join_columns.split("=")
+                right_hand_side = join_columns[1]
+                right_collection_name, right_collection_attribute = right_hand_side.split('.')
+
+                right_existing_attributes = self.get_attributes_list(database_name, right_collection_name)
+
+                if right_collection_attribute not in right_existing_attributes:
+                    raise Exception(
+                        f"The join column {right_collection_attribute} does not exist in the {right_collection_name} ")
+
+                print("The join conditions are correct also when multiple clauses!")
