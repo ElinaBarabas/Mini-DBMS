@@ -1263,10 +1263,19 @@ class ClientMongo:
                 current_equal_index = equal_operator_indexes[i]
                 join_columns = commands[current_equal_index]
                 join_columns = join_columns.split("=")
+
+                left_hand_side = join_columns[0]
                 right_hand_side = join_columns[1]
+
+                left_collection_name, left_collection_attribute = left_hand_side.split('.')
                 right_collection_name, right_collection_attribute = right_hand_side.split('.')
 
+                left_existing_attributes = self.get_attributes_list(database_name, left_collection_name)
                 right_existing_attributes = self.get_attributes_list(database_name, right_collection_name)
+
+                if left_collection_attribute not in left_existing_attributes:
+                    raise Exception(
+                        f"The join column {left_collection_attribute} does not exist in the {left_collection_name} ")
 
                 if right_collection_attribute not in right_existing_attributes:
                     raise Exception(
