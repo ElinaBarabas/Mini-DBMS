@@ -1327,7 +1327,7 @@ class ClientMongo:
                 else:
                     raise Exception(f"The join tables are not the same")
 
-            # else:
+            # else:             # TODO recheck it later
             #
             #     current_equal_index = equal_operator_indexes[i]
             #     join_columns = commands[current_equal_index]
@@ -1403,3 +1403,61 @@ class ClientMongo:
                     join += '\n'
 
         return join
+
+    def group_by(self, commands, database_name):
+
+        resulted_entries = ''
+        commands = commands.split()
+
+        by_keyword_index = commands.index("by")
+        group_by_column = commands[by_keyword_index + 1]
+
+        select_keyword_index = commands.index("select")
+        from_keyword_index = commands.index("from")
+        collection_name = commands[from_keyword_index + 1]
+
+        attributes_list = self.get_attributes_list(database_name, collection_name)
+
+        if group_by_column not in attributes_list:
+            raise Exception(f"There is no '{group_by_column}' column in the '{collection_name}' collection")
+
+        column_name = commands[select_keyword_index + 1: from_keyword_index][0]
+
+        if column_name != group_by_column:
+            raise Exception(
+                f"The query that does not include the specified expression '{column_name}' as part of an aggregate function")
+
+        database = self.client[database_name]
+        collection = database[collection_name]
+        cursor = collection.find({})
+        pk_key = self.get_primary_key(database_name, collection_name)
+
+        resulted_entries_values = ''
+
+        for document in cursor:
+            entry_id = document.get("_id")
+
+            if column_name != pk_key:
+                position = self.get_attribute_position(database_name, collection_name, column_name)
+
+                entry_value = document.get('Value')
+
+                value_list = str(entry_value).split("#")
+                value = value_list[position - 2]
+
+                resulted_entries += value
+                resulted_entries += ' '
+
+            else:
+                resulted_entries += entry_id
+                resulted_entries += ' '
+
+        resulted_entries_values = resulted_entries.split()
+        sorted_list = sorted(resulted_entries_values)
+
+        resulted_entries = '\n'
+        for entry in sorted_list:
+            resulted_entries += entry
+            resulted_entries += '\n'
+
+        return resulted_entries

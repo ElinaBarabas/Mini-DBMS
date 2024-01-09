@@ -80,6 +80,13 @@ def server_program():
                     result_entries = mongo.join(client_request, database_name)
                     data = result_entries
 
+                elif command_type == "select" and "group by" in client_request:
+                    database_name_index = commands.index("on") + 1
+                    database_name = commands[database_name_index]
+                    # controller = Controller(command_type, instance_type, instance_name)
+                    result_entries = mongo.group_by(client_request, database_name)
+                    data = result_entries
+
                 elif command_type == "select":  # select * from grade on table_name
                     instance_name_index = commands.index("from") + 1
                     table_name = commands[instance_name_index]
