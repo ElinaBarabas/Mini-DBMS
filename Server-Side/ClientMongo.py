@@ -1197,7 +1197,6 @@ class ClientMongo:
         return final
 
         # JOINS
-
     def join(self, commands,
              database_name):  # select * from student join assignment on assignment.studentId=student.id join student on student.id=assignment.grade in elina
 
@@ -1212,8 +1211,7 @@ class ClientMongo:
 
         join_keyword_indexes = []
         equal_operator_indexes = []
-
-        is_select_all = True if "*" in commands else False
+        returned_join_entries = ''
 
         first_part_select = ["select", '*', "from"]
 
@@ -1288,35 +1286,39 @@ class ClientMongo:
                                                                      second_collection_name)
 
                     returned_join_entries = self.join_resulted_entries(database_name, first_select_entries, second_select_entries, left_hand_side, right_hand_side)
-                    return returned_join_entries
 
                 else:
                     raise Exception(f"The join tables are not the same")
 
-            else:
+            # else:
+            #
+            #     current_equal_index = equal_operator_indexes[i]
+            #     join_columns = commands[current_equal_index]
+            #     join_columns = join_columns.split("=")
+            #
+            #     left_hand_side = join_columns[0]
+            #     right_hand_side = join_columns[1]
+            #
+            #     left_collection_name, left_collection_attribute = left_hand_side.split('.')
+            #     right_collection_name, right_collection_attribute = right_hand_side.split('.')
+            #
+            #     left_existing_attributes = self.get_attributes_list(database_name, left_collection_name)
+            #     right_existing_attributes = self.get_attributes_list(database_name, right_collection_name)
+            #
+            #     if left_collection_attribute not in left_existing_attributes:
+            #         raise Exception(
+            #             f"The join column {left_collection_attribute} does not exist in the {left_collection_name} ")
+            #
+            #     if right_collection_attribute not in right_existing_attributes:
+            #         raise Exception(
+            #             f"The join column {right_collection_attribute} does not exist in the {right_collection_name} ")
+            #
+            #     # print("The join conditions are correct also when multiple clauses!")
 
-                current_equal_index = equal_operator_indexes[i]
-                join_columns = commands[current_equal_index]
-                join_columns = join_columns.split("=")
+            if returned_join_entries == '':
+                return "No entries match"
+            return returned_join_entries
 
-                left_hand_side = join_columns[0]
-                right_hand_side = join_columns[1]
-
-                left_collection_name, left_collection_attribute = left_hand_side.split('.')
-                right_collection_name, right_collection_attribute = right_hand_side.split('.')
-
-                left_existing_attributes = self.get_attributes_list(database_name, left_collection_name)
-                right_existing_attributes = self.get_attributes_list(database_name, right_collection_name)
-
-                if left_collection_attribute not in left_existing_attributes:
-                    raise Exception(
-                        f"The join column {left_collection_attribute} does not exist in the {left_collection_name} ")
-
-                if right_collection_attribute not in right_existing_attributes:
-                    raise Exception(
-                        f"The join column {right_collection_attribute} does not exist in the {right_collection_name} ")
-
-                # print("The join conditions are correct also when multiple clauses!")
 
     def complex_join(self, commands, database_name):
 
