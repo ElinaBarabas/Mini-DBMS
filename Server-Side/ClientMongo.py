@@ -1199,7 +1199,7 @@ class ClientMongo:
         # JOIN
 
     def join(self, commands,
-                    database_name):
+             database_name):
         # select * from student join assignment on student.id=assignment.studentId where student.id=11 in elina
         commands = commands.split()
 
