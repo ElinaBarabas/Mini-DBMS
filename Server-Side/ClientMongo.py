@@ -1196,22 +1196,21 @@ class ClientMongo:
 
         return final
 
-        # JOINS
+        # JOIN
+
     def join(self, commands,
-             database_name):  # select * from student join assignment on assignment.studentId=student.id join student on student.id=assignment.grade in elina
-
+                    database_name):
+        # select * from student join assignment on student.id=assignment.studentId where student.id=11 in elina
         commands = commands.split()
-        if 'where' not in commands:
-            return self.simple_join(commands, database_name)
-        else:
-            return self.complex_join(commands, database_name)
-
-    def simple_join(self, commands,
-                    database_name):  # select name from student join assignment on student.id=assignment.studentId join student on student.id=assignment.grade in elina
 
         join_keyword_indexes = []
         equal_operator_indexes = []
         returned_join_entries = ''
+        where_condition_part = ''
+
+        if 'where' in commands:
+            where_keyword_index = commands.index("where")
+            where_condition_part = commands[where_keyword_index:-2]
 
         first_part_select = ["select", '*', "from"]
 
@@ -1220,9 +1219,6 @@ class ClientMongo:
                 join_keyword_indexes.append(i)
             elif "=" in commands[i]:
                 equal_operator_indexes.append(i)
-
-        if len(join_keyword_indexes) != len(equal_operator_indexes):
-            raise Exception("The number of joins and joins conditions should be the same")
 
         first_join = True
         for i in range(len(join_keyword_indexes)):
@@ -1266,10 +1262,27 @@ class ClientMongo:
                             f"The join column {right_collection_attribute} does not exist in the {right_collection_name} ")
 
                     first_join = False
-                    # print("The join conditions are correct!")
 
                     first_select_statement = copy.copy(first_part_select)
                     first_select_statement.append(first_collection_name)
+
+                    first_select_statement.append('where')
+
+                    is_complex = False
+                    if where_condition_part:
+                        for part in where_condition_part:
+                            if first_collection_name in part:
+                                is_complex = True
+                                column = part.split('=')[0]
+                                column_name = column.split('.')[1]
+                                column_value = part.split('=')[1]
+
+                                value = column_name + '=' + column_value
+                                first_select_statement.append(value)
+
+                    if not is_complex:
+                        first_select_statement.remove('where')
+
                     first_select_statement.append('on')
                     first_select_statement.append(database_name)
 
@@ -1279,13 +1292,37 @@ class ClientMongo:
 
                     second_select_statement = copy.copy(first_part_select)
                     second_select_statement.append(second_collection_name)
+
+                    second_select_statement.append('where')
+
+                    is_complex = False
+
+                    if where_condition_part:
+                        for part in where_condition_part:
+                            if second_collection_name in part:
+                                is_complex = True
+                                column = part.split('=')[0]
+                                column_name = column.split('.')[1]
+                                column_value = part.split('=')[1]
+
+                                value = column_name + '=' + column_value
+                                second_select_statement.append(value)
+
+                    if not is_complex:
+                        second_select_statement.remove('where')
+
                     second_select_statement.append('on')
                     second_select_statement.append(database_name)
 
                     second_select_entries = self.select_data_mongoDB(second_select_statement, database_name,
                                                                      second_collection_name)
 
-                    returned_join_entries = self.join_resulted_entries(database_name, first_select_entries, second_select_entries, left_hand_side, right_hand_side)
+                    if first_select_entries != 'No entries match' and second_select_entries != 'No entries match':
+                        returned_join_entries = self.join_resulted_entries(database_name, first_select_entries,
+                                                                           second_select_entries, left_hand_side,
+                                                                           right_hand_side)
+                    else:
+                        returned_join_entries = 'No entries match'
 
                 else:
                     raise Exception(f"The join tables are not the same")
@@ -1313,22 +1350,13 @@ class ClientMongo:
             #         raise Exception(
             #             f"The join column {right_collection_attribute} does not exist in the {right_collection_name} ")
             #
-            #     # print("The join conditions are correct also when multiple clauses!")
 
             if returned_join_entries == '':
                 return "No entries match"
             return returned_join_entries
 
-
-    def complex_join(self, commands, database_name):
-
-        if 'where' in commands:
-            where_keyword_index = commands.index("where")
-            where_condition = commands[where_keyword_index::]
-            where_condition[-2] = "on"
-            complex_join = True
-
-    def join_resulted_entries(self, database_name, first_select_entries, second_select_entries, left_hand_side, right_hand_side):
+    def join_resulted_entries(self, database_name, first_select_entries, second_select_entries, left_hand_side,
+                              right_hand_side):
 
         left_collection_name, left_attribute = left_hand_side.split('.')
         right_collection_name, right_attribute = right_hand_side.split('.')
@@ -1345,12 +1373,14 @@ class ClientMongo:
         if left_attribute == first_collection_pk:
             first_collection_column_index = 0
         else:
-            first_collection_column_index = self.get_attribute_position(database_name, left_collection_name, left_attribute) - 1
+            first_collection_column_index = self.get_attribute_position(database_name, left_collection_name,
+                                                                        left_attribute) - 1
 
         if right_attribute == second_collection_pk:
             second_collection_column_index = 0
         else:
-            second_collection_column_index = self.get_attribute_position(database_name, right_collection_name, right_attribute) - 1
+            second_collection_column_index = self.get_attribute_position(database_name, right_collection_name,
+                                                                         right_attribute) - 1
 
         print(left_collection_name, left_attribute, first_collection_column_index)
         print(right_collection_name, right_attribute, second_collection_column_index)
@@ -1373,9 +1403,3 @@ class ClientMongo:
                     join += '\n'
 
         return join
-
-
-
-
-
-
