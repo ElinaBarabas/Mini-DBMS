@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 
@@ -1197,11 +1198,24 @@ class ClientMongo:
 
         # JOINS
 
-    def join(self, commands, database_name):  # select * from ttt join student on ttt.numefk=student.nume in test1
+    def join(self, commands,
+             database_name):  # select * from student join assignment on assignment.studentId=student.id join student on student.id=assignment.grade in elina
+
         commands = commands.split()
+        if 'where' not in commands:
+            return self.simple_join(commands, database_name)
+        else:
+            return self.complex_join(commands, database_name)
+
+    def simple_join(self, commands,
+                    database_name):  # select name from student join assignment on student.id=assignment.studentId join student on student.id=assignment.grade in elina
 
         join_keyword_indexes = []
         equal_operator_indexes = []
+
+        is_select_all = True if "*" in commands else False
+
+        first_part_select = ["select", '*', "from"]
 
         for i in range(len(commands)):
             if commands[i] == "join":
@@ -1254,7 +1268,28 @@ class ClientMongo:
                             f"The join column {right_collection_attribute} does not exist in the {right_collection_name} ")
 
                     first_join = False
-                    print("The join conditions are correct!")
+                    # print("The join conditions are correct!")
+
+                    first_select_statement = copy.copy(first_part_select)
+                    first_select_statement.append(first_collection_name)
+                    first_select_statement.append('on')
+                    first_select_statement.append(database_name)
+
+                    print(first_select_statement)
+                    first_select_entries = self.select_data_mongoDB(first_select_statement, database_name,
+                                                                    first_collection_name)
+
+                    second_select_statement = copy.copy(first_part_select)
+                    second_select_statement.append(second_collection_name)
+                    second_select_statement.append('on')
+                    second_select_statement.append(database_name)
+
+                    second_select_entries = self.select_data_mongoDB(second_select_statement, database_name,
+                                                                     second_collection_name)
+
+                    returned_join_entries = self.join_resulted_entries(database_name, first_select_entries, second_select_entries, left_hand_side, right_hand_side)
+                    return returned_join_entries
+
                 else:
                     raise Exception(f"The join tables are not the same")
 
@@ -1281,4 +1316,64 @@ class ClientMongo:
                     raise Exception(
                         f"The join column {right_collection_attribute} does not exist in the {right_collection_name} ")
 
-                print("The join conditions are correct also when multiple clauses!")
+                # print("The join conditions are correct also when multiple clauses!")
+
+    def complex_join(self, commands, database_name):
+
+        if 'where' in commands:
+            where_keyword_index = commands.index("where")
+            where_condition = commands[where_keyword_index::]
+            where_condition[-2] = "on"
+            complex_join = True
+
+    def join_resulted_entries(self, database_name, first_select_entries, second_select_entries, left_hand_side, right_hand_side):
+
+        left_collection_name, left_attribute = left_hand_side.split('.')
+        right_collection_name, right_attribute = right_hand_side.split('.')
+
+        first_select_elements = first_select_entries.strip().split('\n')
+        second_select_elements = second_select_entries.strip().split('\n')
+
+        first_select_elements = [item.replace(',', '') for item in first_select_elements]
+        second_select_elements = [item.replace(',', '') for item in second_select_elements]
+
+        first_collection_pk = self.get_primary_key(database_name, left_collection_name)
+        second_collection_pk = self.get_primary_key(database_name, right_collection_name)
+
+        if left_attribute == first_collection_pk:
+            first_collection_column_index = 0
+        else:
+            first_collection_column_index = self.get_attribute_position(database_name, left_collection_name, left_attribute) - 1
+
+        if right_attribute == second_collection_pk:
+            second_collection_column_index = 0
+        else:
+            second_collection_column_index = self.get_attribute_position(database_name, right_collection_name, right_attribute) - 1
+
+        print(left_collection_name, left_attribute, first_collection_column_index)
+        print(right_collection_name, right_attribute, second_collection_column_index)
+
+        join = '\n'
+
+        for first_element in first_select_elements:
+
+            first_select_values = first_element.split()
+            first_join_value = first_select_values[first_collection_column_index]
+
+            for second_element in second_select_elements:
+                second_select_values = second_element.split()
+                second_join_value = second_select_values[second_collection_column_index]
+
+                if first_join_value == second_join_value:
+                    join += first_element
+                    join += '  -  '
+                    join += second_element
+                    join += '\n'
+
+        return join
+
+
+
+
+
+
